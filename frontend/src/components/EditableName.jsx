@@ -84,7 +84,7 @@ export default function EditableName({ value, onSave, testid = "editable-name", 
       <button
         onClick={() => setEditing(true)}
         data-testid={`${testid}-edit`}
-        className="mt-2 p-1 text-muted opacity-0 group-hover:opacity-100 hover:text-accent transition-opacity"
+        className="mt-2 p-1 text-muted opacity-40 sm:opacity-30 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition-opacity"
         aria-label="Rename"
       >
         <Pencil className="w-4 h-4" />
