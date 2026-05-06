@@ -31,15 +31,15 @@ export default function Dashboard() {
   return (
     <div className="space-y-10 animate-fade-up" data-testid="dashboard-page">
       <div>
-        <div className="text-[10px] tracking-[0.4em] uppercase text-[#00E5FF] mb-3">
+        <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">
           / / Overview
         </div>
         <h1 className="font-display font-black text-5xl md:text-7xl uppercase tracking-tighter leading-[0.9]">
           Command
           <br />
-          <span className="text-[#00E5FF]">Center</span>
+          <span className="text-accent">Center</span>
         </h1>
-        <p className="text-white/60 text-sm mt-4 max-w-xl">
+        <p className="text-secondary text-sm mt-4 max-w-xl">
           Every segment. Every ride. Every effort. Tracked locally, analysed with precision.
         </p>
       </div>
@@ -50,16 +50,16 @@ export default function Dashboard() {
             key={c.label}
             to={c.to}
             data-testid={c.testid}
-            className="border border-white/10 bg-[#0A0A0C] p-6 hover:bg-[#141418] hover:border-[#00E5FF]/50 transition-colors duration-150 group"
+            className="border border-line bg-surface p-6 hover:bg-elevated hover:border-accent-50 transition-colors duration-150 group"
           >
             <div className="flex items-center justify-between">
-              <div className="text-[10px] tracking-[0.3em] uppercase text-white/40">
+              <div className="text-[10px] tracking-[0.3em] uppercase text-muted">
                 {c.label}
               </div>
-              <c.icon className="w-4 h-4 text-white/30 group-hover:text-[#00E5FF]" strokeWidth={1.5} />
+              <c.icon className="w-4 h-4 text-faint group-hover:text-accent" strokeWidth={1.5} />
             </div>
             <div className="font-num text-7xl font-black mt-3 leading-none">{c.value}</div>
-            <div className="mt-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-white/40 group-hover:text-[#00E5FF]">
+            <div className="mt-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted group-hover:text-accent">
               View <ArrowRight className="w-3 h-3" />
             </div>
           </Link>
@@ -67,17 +67,17 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="border border-white/10 bg-[#0A0A0C] p-6" data-testid="recent-rides">
+        <div className="border border-line bg-surface p-6" data-testid="recent-rides">
           <div className="flex items-center justify-between mb-4">
             <div className="font-display font-bold uppercase tracking-tight text-lg">
               Recent Rides
             </div>
-            <Link to="/rides" className="text-[10px] uppercase tracking-[0.3em] text-[#00E5FF]">
+            <Link to="/rides" className="text-[10px] uppercase tracking-[0.3em] text-accent">
               All →
             </Link>
           </div>
           {rides.length === 0 ? (
-            <div className="text-white/40 text-sm">No rides uploaded yet.</div>
+            <div className="text-muted text-sm">No rides uploaded yet.</div>
           ) : (
             <div className="divide-y divide-white/5">
               {rides.map((r) => (
@@ -85,17 +85,17 @@ export default function Dashboard() {
                   key={r.id}
                   to={`/rides?id=${r.id}`}
                   data-testid={`recent-ride-${r.id}`}
-                  className="flex items-center justify-between py-3 hover:bg-white/5 px-2 -mx-2"
+                  className="flex items-center justify-between py-3 hover:bg-subtle px-2 -mx-2"
                 >
                   <div>
                     <div className="font-semibold text-sm truncate max-w-[240px]">{r.name}</div>
-                    <div className="text-[10px] tracking-[0.2em] uppercase text-white/40">
+                    <div className="text-[10px] tracking-[0.2em] uppercase text-muted">
                       {fmtDateLocal(r.start_time || r.created_at)} · {r.source_type.toUpperCase()}
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-num text-xl">{fmtDistance(r.distance_m)}</div>
-                    <div className="text-[10px] tracking-[0.2em] uppercase text-white/40">
+                    <div className="text-[10px] tracking-[0.2em] uppercase text-muted">
                       {fmtTime(r.duration_s)} · {r.effort_count} efforts
                     </div>
                   </div>
@@ -105,17 +105,17 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="border border-white/10 bg-[#0A0A0C] p-6" data-testid="recent-segments">
+        <div className="border border-line bg-surface p-6" data-testid="recent-segments">
           <div className="flex items-center justify-between mb-4">
             <div className="font-display font-bold uppercase tracking-tight text-lg">
               Segments
             </div>
-            <Link to="/segments" className="text-[10px] uppercase tracking-[0.3em] text-[#00E5FF]">
+            <Link to="/segments" className="text-[10px] uppercase tracking-[0.3em] text-accent">
               All →
             </Link>
           </div>
           {segments.length === 0 ? (
-            <div className="text-white/40 text-sm">No segments defined yet.</div>
+            <div className="text-muted text-sm">No segments defined yet.</div>
           ) : (
             <div className="divide-y divide-white/5">
               {segments.map((s) => (
@@ -123,17 +123,17 @@ export default function Dashboard() {
                   key={s.id}
                   to={`/segments?id=${s.id}`}
                   data-testid={`recent-segment-${s.id}`}
-                  className="flex items-center justify-between py-3 hover:bg-white/5 px-2 -mx-2"
+                  className="flex items-center justify-between py-3 hover:bg-subtle px-2 -mx-2"
                 >
                   <div>
                     <div className="font-semibold text-sm truncate max-w-[240px]">{s.name}</div>
-                    <div className="text-[10px] tracking-[0.2em] uppercase text-white/40 flex items-center gap-1">
+                    <div className="text-[10px] tracking-[0.2em] uppercase text-muted flex items-center gap-1">
                       <Activity className="w-3 h-3" /> {fmtDateLocal(s.created_at)}
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="font-num text-xl">{fmtDistance(s.distance_m)}</div>
-                    <div className="text-[10px] tracking-[0.2em] uppercase text-white/40">
+                    <div className="text-[10px] tracking-[0.2em] uppercase text-muted">
                       +{Math.round(s.elevation_gain_m)} m
                     </div>
                   </div>

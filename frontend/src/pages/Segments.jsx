@@ -3,11 +3,13 @@ import { useSearchParams } from "react-router-dom";
 import UploadZone from "../components/UploadZone";
 import MapView from "../components/MapView";
 import ElevationChart from "../components/ElevationChart";
+import EditableName from "../components/EditableName";
 import {
   deleteSegment,
   getSegment,
   listSegments,
   uploadSegment,
+  renameSegment,
   fmtDistance,
 } from "../lib/api";
 import { Trash2, MapPin, Mountain } from "lucide-react";
@@ -67,7 +69,7 @@ export default function Segments() {
   return (
     <div className="space-y-8 animate-fade-up" data-testid="segments-page">
       <div>
-        <div className="text-[10px] tracking-[0.4em] uppercase text-[#00E5FF] mb-3">/ / Segments</div>
+        <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">/ / Segments</div>
         <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
           Define Your Arena
         </h1>
@@ -81,19 +83,19 @@ export default function Segments() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-4 border border-white/10 bg-[#0A0A0C]" data-testid="segments-list">
-          <div className="p-4 border-b border-white/10">
+        <div className="lg:col-span-4 border border-line bg-surface" data-testid="segments-list">
+          <div className="p-4 border-b border-line">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search segments..."
               data-testid="segments-search"
-              className="w-full bg-transparent border border-white/10 px-3 py-2 text-sm focus:outline-none focus:border-[#00E5FF]"
+              className="w-full bg-transparent border border-line px-3 py-2 text-sm focus:outline-none focus:border-accent"
             />
           </div>
           <div className="max-h-[600px] overflow-auto">
             {filtered.length === 0 ? (
-              <div className="p-6 text-white/40 text-sm">No segments</div>
+              <div className="p-6 text-muted text-sm">No segments</div>
             ) : (
               filtered.map((s) => (
                 <div
@@ -105,21 +107,21 @@ export default function Segments() {
                     if (e.key === "Enter" || e.key === " ") handleSelect(s.id);
                   }}
                   data-testid={`segment-item-${s.id}`}
-                  className={`w-full cursor-pointer text-left border-b border-white/5 px-4 py-3 flex items-start gap-3 transition-colors ${
-                    selected?.id === s.id ? "bg-[#141418] border-l-2 border-l-[#00E5FF]" : "hover:bg-white/5"
+                  className={`w-full cursor-pointer text-left border-b border-line-subtle px-4 py-3 flex items-start gap-3 transition-colors ${
+                    selected?.id === s.id ? "bg-elevated border-l-2 border-l-accent" : "hover:bg-subtle"
                   }`}
                 >
-                  <MapPin className="w-4 h-4 text-[#00E5FF] mt-0.5 flex-shrink-0" />
+                  <MapPin className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm truncate">{s.name}</div>
-                    <div className="text-[10px] tracking-[0.2em] uppercase text-white/40 mt-1">
+                    <div className="text-[10px] tracking-[0.2em] uppercase text-muted mt-1">
                       {fmtDistance(s.distance_m)} · +{Math.round(s.elevation_gain_m)}m
                     </div>
                   </div>
                   <button
                     onClick={(e) => handleDelete(s.id, e)}
                     data-testid={`segment-delete-${s.id}`}
-                    className="p-1 text-white/30 hover:text-[#FF3B30]"
+                    className="p-1 text-faint hover:text-danger"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -132,15 +134,23 @@ export default function Segments() {
         <div className="lg:col-span-8 space-y-4" data-testid="segment-detail-panel">
           {selected ? (
             <>
-              <div className="border border-white/10 bg-[#0A0A0C] p-6">
+              <div className="border border-line bg-surface p-6">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-[10px] tracking-[0.3em] uppercase text-[#00E5FF] mb-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] tracking-[0.3em] uppercase text-accent mb-2">
                       Segment
                     </div>
-                    <h2 className="font-display font-black text-3xl uppercase tracking-tight leading-tight">
-                      {selected.name}
-                    </h2>
+                    <EditableName
+                      value={selected.name}
+                      testid="segment-name"
+                      className="font-display font-black text-3xl uppercase tracking-tight leading-tight"
+                      onSave={async (next) => {
+                        await renameSegment(selected.id, next);
+                        toast.success("Renamed");
+                        setSelected({ ...selected, name: next });
+                        await refresh();
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mt-6">
@@ -157,7 +167,7 @@ export default function Segments() {
               <ElevationChart points={selected.points} height={200} testid="segment-elevation" />
             </>
           ) : (
-            <div className="border border-white/10 bg-[#0A0A0C] p-12 text-center text-white/40">
+            <div className="border border-line bg-surface p-12 text-center text-muted">
               Select a segment to view details.
             </div>
           )}
@@ -170,7 +180,7 @@ export default function Segments() {
 function Stat({ label, value, icon: Icon }) {
   return (
     <div>
-      <div className="text-[10px] tracking-[0.3em] uppercase text-white/40 flex items-center gap-1">
+      <div className="text-[10px] tracking-[0.3em] uppercase text-muted flex items-center gap-1">
         {Icon && <Icon className="w-3 h-3" />} {label}
       </div>
       <div className="font-num text-3xl font-black mt-1">{value}</div>

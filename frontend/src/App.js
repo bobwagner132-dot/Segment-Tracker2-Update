@@ -7,34 +7,41 @@ import Segments from "@/pages/Segments";
 import Rides from "@/pages/Rides";
 import Leaderboards from "@/pages/Leaderboards";
 import Backup from "@/pages/Backup";
+import { ThemeProvider, useTheme } from "@/lib/theme";
+
+function ThemedToaster() {
+  const { theme } = useTheme();
+  return (
+    <Toaster
+      position="top-right"
+      theme={theme}
+      toastOptions={{
+        style: {
+          borderRadius: 0,
+          fontFamily: "Manrope, sans-serif",
+        },
+      }}
+    />
+  );
+}
 
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/segments" element={<Segments />} />
-            <Route path="/rides" element={<Rides />} />
-            <Route path="/leaderboards" element={<Leaderboards />} />
-            <Route path="/backup" element={<Backup />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-      <Toaster
-        position="top-right"
-        theme="dark"
-        toastOptions={{
-          style: {
-            background: "#0A0A0C",
-            border: "1px solid rgba(255,255,255,0.1)",
-            color: "#fff",
-            borderRadius: 0,
-            fontFamily: "Manrope, sans-serif",
-          },
-        }}
-      />
+      <ThemeProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/segments" element={<Segments />} />
+              <Route path="/rides" element={<Rides />} />
+              <Route path="/leaderboards" element={<Leaderboards />} />
+              <Route path="/backup" element={<Backup />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+        <ThemedToaster />
+      </ThemeProvider>
     </div>
   );
 }

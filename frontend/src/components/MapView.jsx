@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, Polyline, CircleMarker, useMap } from "react-leaflet";
+import { useTheme } from "@/lib/theme";
 
 function FitBounds({ points }) {
   const map = useMap();
@@ -15,6 +16,17 @@ function FitBounds({ points }) {
   return null;
 }
 
+const TILE_CONFIG = {
+  dark: {
+    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    attribution: "&copy; OSM &copy; CARTO",
+  },
+  light: {
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    attribution: "&copy; OSM &copy; CARTO",
+  },
+};
+
 export default function MapView({
   points = [],
   color = "#00E5FF",
@@ -23,6 +35,7 @@ export default function MapView({
   height = 420,
   testid = "map-view",
 }) {
+  const { theme } = useTheme();
   const positions = useMemo(() => points.map((p) => [p.lat, p.lon]), [points]);
   const overlayPositions = useMemo(
     () => (overlayPoints ? overlayPoints.map((p) => [p.lat, p.lon]) : []),
@@ -33,7 +46,7 @@ export default function MapView({
     return (
       <div
         data-testid={`${testid}-empty`}
-        className="border border-white/10 bg-[#0A0A0C] flex items-center justify-center text-white/40 text-xs tracking-[0.2em] uppercase"
+        className="border border-line bg-surface flex items-center justify-center text-muted text-xs tracking-[0.2em] uppercase"
         style={{ height }}
       >
         No route data
@@ -43,11 +56,12 @@ export default function MapView({
 
   const start = positions[0];
   const end = positions[positions.length - 1];
+  const tile = TILE_CONFIG[theme] || TILE_CONFIG.dark;
 
   return (
     <div
       data-testid={testid}
-      className="border border-white/10 overflow-hidden bg-[#0A0A0C]"
+      className="border border-line overflow-hidden bg-surface"
       style={{ height }}
     >
       <MapContainer
@@ -56,17 +70,12 @@ export default function MapView({
         scrollWheelZoom
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OSM &copy; CARTO'
-          subdomains="abcd"
-          maxZoom={19}
-        />
+        <TileLayer url={tile.url} attribution={tile.attribution} subdomains="abcd" maxZoom={19} />
         <Polyline positions={positions} pathOptions={{ color, weight: 4, opacity: 0.9 }} />
         {overlayPositions.length > 0 && (
           <Polyline
             positions={overlayPositions}
-            pathOptions={{ color: overlayColor, weight: 5, opacity: 0.95 }}
+            pathOptions={{ color: overlayColor, weight: 6, opacity: 1 }}
           />
         )}
         <CircleMarker

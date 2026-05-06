@@ -246,6 +246,74 @@ class TestBackupRestore:
         assert d2["rides"] == len(pytest.backup_payload["rides"])
 
 
+class TestRenameAndRideDetail:
+    """New in iteration 2: PATCH endpoints + enriched GET /api/rides/{id}."""
+
+    def test_get_ride_detail_has_segment_name_and_points(self, client):
+        r = client.get(f"{API}/rides/{pytest.ride_id}", timeout=15)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["efforts"], "expected at least one effort"
+        eff = d["efforts"][0]
+        # New fields added in this iteration
+        assert "segment_name" in eff and isinstance(eff["segment_name"], str) and eff["segment_name"]
+        assert "points" in eff and isinstance(eff["points"], list) and len(eff["points"]) >= 2
+        # points should be a slice (decimated) of ride points
+        assert all("lat" in p and "lon" in p for p in eff["points"])
+
+    def test_patch_segment_rename(self, client):
+        r = client.patch(
+            f"{API}/segments/{pytest.seg_id}", json={"name": "TEST_SEG_RENAMED"}, timeout=15
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body == {"ok": True, "name": "TEST_SEG_RENAMED"}
+        # GET returns new name
+        g = client.get(f"{API}/segments/{pytest.seg_id}", timeout=15).json()
+        assert g["name"] == "TEST_SEG_RENAMED"
+
+    def test_patch_segment_empty_name_400(self, client):
+        r = client.patch(
+            f"{API}/segments/{pytest.seg_id}", json={"name": "   "}, timeout=15
+        )
+        assert r.status_code == 400
+
+    def test_patch_segment_missing_id_404(self, client):
+        r = client.patch(
+            f"{API}/segments/00000000-0000-0000-0000-000000000000",
+            json={"name": "X"}, timeout=15,
+        )
+        assert r.status_code == 404
+
+    def test_patch_ride_rename_propagates_to_efforts(self, client):
+        new_name = "TEST_RIDE_RENAMED"
+        r = client.patch(
+            f"{API}/rides/{pytest.ride_id}", json={"name": new_name}, timeout=15
+        )
+        assert r.status_code == 200, r.text
+        assert r.json() == {"ok": True, "name": new_name}
+        # Ride detail reflects new name
+        g = client.get(f"{API}/rides/{pytest.ride_id}", timeout=15).json()
+        assert g["name"] == new_name
+        # efforts list (per segment) reflects updated ride_name
+        efforts = client.get(f"{API}/segments/{pytest.seg_id}/efforts", timeout=15).json()
+        ride_efforts = [e for e in efforts if e["ride_id"] == pytest.ride_id]
+        assert ride_efforts and all(e["ride_name"] == new_name for e in ride_efforts)
+
+    def test_patch_ride_empty_name_400(self, client):
+        r = client.patch(
+            f"{API}/rides/{pytest.ride_id}", json={"name": ""}, timeout=15
+        )
+        assert r.status_code == 400
+
+    def test_patch_ride_missing_id_404(self, client):
+        r = client.patch(
+            f"{API}/rides/00000000-0000-0000-0000-000000000000",
+            json={"name": "X"}, timeout=15,
+        )
+        assert r.status_code == 404
+
+
 class TestDeletion:
     def test_delete_ride_cascades_efforts(self, client):
         rid = pytest.ride_id

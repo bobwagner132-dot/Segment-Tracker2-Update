@@ -489,6 +489,10 @@ async def upload_ride(file: UploadFile = File(...)):
             await db.efforts.insert_one(eff_doc)
             # insert_one mutates eff_doc adding Mongo ObjectId _id; strip before returning
             eff_doc.pop("_id", None)
+            eff_doc["segment_name"] = seg["name"]
+            eff_doc["points"] = decimate(
+                points[eff["start_idx"] : eff["end_idx"] + 1], max_points=500
+            )
             all_efforts.append(eff_doc)
 
     return RideDetail(
@@ -536,6 +540,20 @@ async def get_ride(ride_id: str):
     if not r:
         raise HTTPException(status_code=404, detail="Ride not found")
     efforts = await db.efforts.find({"ride_id": ride_id}, {"_id": 0}).to_list(10000)
+    pts = r["points"]
+    # Attach segment name + decimated slice for each effort so frontend can overlay it
+    seg_cache: Dict[str, str] = {}
+    for e in efforts:
+        s_idx = e.get("start_idx")
+        end_idx = e.get("end_idx")
+        if isinstance(s_idx, int) and isinstance(end_idx, int) and 0 <= s_idx <= end_idx < len(pts):
+            e["points"] = decimate(pts[s_idx : end_idx + 1], max_points=500)
+        sid = e.get("segment_id")
+        if sid:
+            if sid not in seg_cache:
+                seg = await db.segments.find_one({"id": sid}, {"_id": 0, "name": 1})
+                seg_cache[sid] = seg["name"] if seg else "Unknown segment"
+            e["segment_name"] = seg_cache[sid]
     return RideDetail(
         id=r["id"],
         name=r["name"],
@@ -543,12 +561,40 @@ async def get_ride(ride_id: str):
         start_time=r.get("start_time"),
         duration_s=r.get("duration_s", 0),
         distance_m=r.get("distance_m", 0),
-        point_count=len(r["points"]),
+        point_count=len(pts),
         created_at=r["created_at"],
         effort_count=len(efforts),
-        points=decimate(r["points"]),
+        points=decimate(pts),
         efforts=efforts,
     )
+
+
+class RenamePayload(BaseModel):
+    name: str
+
+
+@api_router.patch("/segments/{segment_id}")
+async def rename_segment(segment_id: str, payload: RenamePayload):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    res = await db.segments.update_one({"id": segment_id}, {"$set": {"name": name}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Segment not found")
+    return {"ok": True, "name": name}
+
+
+@api_router.patch("/rides/{ride_id}")
+async def rename_ride(ride_id: str, payload: RenamePayload):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    res = await db.rides.update_one({"id": ride_id}, {"$set": {"name": name}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    # Also update ride_name inside efforts for consistency
+    await db.efforts.update_many({"ride_id": ride_id}, {"$set": {"ride_name": name}})
+    return {"ok": True, "name": name}
 
 
 @api_router.delete("/rides/{ride_id}")

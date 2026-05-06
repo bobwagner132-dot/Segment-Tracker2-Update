@@ -48,8 +48,8 @@ export default function UploadZone({
       onClick={() => inputRef.current?.click()}
       className={`cursor-pointer border border-dashed p-10 text-center transition-colors duration-150 ${
         drag
-          ? "border-[#00E5FF] bg-[#00E5FF]/5"
-          : "border-white/15 hover:border-[#00E5FF] hover:bg-[#00E5FF]/5"
+          ? "border-accent bg-accent-5"
+          : "border-line-strong hover:border-accent hover:bg-accent-5"
       }`}
     >
       <input
@@ -63,14 +63,14 @@ export default function UploadZone({
       />
       <div className="flex flex-col items-center gap-3">
         {busy ? (
-          <Loader2 className="w-8 h-8 text-[#00E5FF] animate-spin" />
+          <Loader2 className="w-8 h-8 text-accent animate-spin" />
         ) : (
-          <Upload className="w-8 h-8 text-[#00E5FF]" strokeWidth={1.5} />
+          <Upload className="w-8 h-8 text-accent" strokeWidth={1.5} />
         )}
         <div className="font-display font-bold uppercase tracking-tight text-lg">
           {busy ? "Processing..." : label}
         </div>
-        <div className="text-xs tracking-[0.2em] uppercase text-white/40">{sublabel}</div>
+        <div className="text-xs tracking-[0.2em] uppercase text-muted">{sublabel}</div>
       </div>
     </div>
   );

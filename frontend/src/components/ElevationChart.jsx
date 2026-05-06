@@ -33,7 +33,7 @@ export default function ElevationChart({ points = [], height = 180, testid = "el
     return (
       <div
         data-testid={`${testid}-empty`}
-        className="border border-white/10 bg-[#0A0A0C] flex items-center justify-center text-white/40 text-xs tracking-[0.2em] uppercase"
+        className="border border-line bg-surface flex items-center justify-center text-muted text-xs tracking-[0.2em] uppercase"
         style={{ height }}
       >
         No elevation data
@@ -42,10 +42,10 @@ export default function ElevationChart({ points = [], height = 180, testid = "el
   }
 
   return (
-    <div data-testid={testid} className="border border-white/10 bg-[#0A0A0C] p-4" style={{ height }}>
+    <div data-testid={testid} className="border border-line bg-surface p-4" style={{ height }}>
       <div className="flex items-center justify-between mb-2">
-        <div className="text-[10px] tracking-[0.3em] uppercase text-white/40">Elevation Profile</div>
-        <div className="text-[10px] tracking-[0.3em] uppercase text-white/40">km / m</div>
+        <div className="text-[10px] tracking-[0.3em] uppercase text-muted">Elevation Profile</div>
+        <div className="text-[10px] tracking-[0.3em] uppercase text-muted">km / m</div>
       </div>
       <ResponsiveContainer width="100%" height="85%">
         <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>

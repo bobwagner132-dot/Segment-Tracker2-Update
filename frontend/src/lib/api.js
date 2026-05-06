@@ -49,6 +49,15 @@ export async function deleteRide(id) {
   return data;
 }
 
+export async function renameSegment(id, name) {
+  const { data } = await api.patch(`/segments/${id}`, { name });
+  return data;
+}
+export async function renameRide(id, name) {
+  const { data } = await api.patch(`/rides/${id}`, { name });
+  return data;
+}
+
 export async function listEfforts(segmentId) {
   const { data } = await api.get(`/segments/${segmentId}/efforts`);
   return data;
