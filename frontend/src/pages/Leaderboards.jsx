@@ -39,6 +39,12 @@ export default function Leaderboards() {
     return Array.from(ys).sort((a, b) => b - a);
   }, [efforts]);
 
+  useEffect(() => {
+    if (years.length > 0 && !years.includes(year)) {
+      setYear(years[0]);
+    }
+  }, [years, year]);
+
   const filtered = useMemo(() => {
     return efforts
       .filter((e) => localYear(e.datetime_utc) === year)

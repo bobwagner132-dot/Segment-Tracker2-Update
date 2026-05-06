@@ -96,11 +96,16 @@ export default function Segments() {
               <div className="p-6 text-white/40 text-sm">No segments</div>
             ) : (
               filtered.map((s) => (
-                <button
+                <div
                   key={s.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelect(s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") handleSelect(s.id);
+                  }}
                   data-testid={`segment-item-${s.id}`}
-                  className={`w-full text-left border-b border-white/5 px-4 py-3 flex items-start gap-3 transition-colors ${
+                  className={`w-full cursor-pointer text-left border-b border-white/5 px-4 py-3 flex items-start gap-3 transition-colors ${
                     selected?.id === s.id ? "bg-[#141418] border-l-2 border-l-[#00E5FF]" : "hover:bg-white/5"
                   }`}
                 >
@@ -118,7 +123,7 @@ export default function Segments() {
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-                </button>
+                </div>
               ))
             )}
           </div>

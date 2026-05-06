@@ -107,11 +107,16 @@ export default function Rides() {
               <div className="p-6 text-white/40 text-sm">No rides</div>
             ) : (
               filtered.map((r) => (
-                <button
+                <div
                   key={r.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelect(r.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") handleSelect(r.id);
+                  }}
                   data-testid={`ride-item-${r.id}`}
-                  className={`w-full text-left border-b border-white/5 px-4 py-3 flex items-start gap-3 transition-colors ${
+                  className={`w-full cursor-pointer text-left border-b border-white/5 px-4 py-3 flex items-start gap-3 transition-colors ${
                     selected?.id === r.id ? "bg-[#141418] border-l-2 border-l-[#00E5FF]" : "hover:bg-white/5"
                   }`}
                 >
@@ -130,7 +135,7 @@ export default function Rides() {
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-                </button>
+                </div>
               ))
             )}
           </div>

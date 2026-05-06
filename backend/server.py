@@ -365,6 +365,7 @@ async def upload_segment(file: UploadFile = File(...)):
                 "end_idx": eff["end_idx"],
             }
             await db.efforts.insert_one(eff_doc)
+            eff_doc.pop("_id", None)
 
     return SegmentDetail(
         id=seg_id,
