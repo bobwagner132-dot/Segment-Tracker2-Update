@@ -7,6 +7,7 @@ import Segments from "@/pages/Segments";
 import Rides from "@/pages/Rides";
 import Leaderboards from "@/pages/Leaderboards";
 import Backup from "@/pages/Backup";
+import Preferences from "@/pages/Preferences";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 
 function ThemedToaster() {
@@ -37,6 +38,7 @@ function App() {
               <Route path="/rides" element={<Rides />} />
               <Route path="/leaderboards" element={<Leaderboards />} />
               <Route path="/backup" element={<Backup />} />
+              <Route path="/preferences" element={<Preferences />} />
             </Route>
           </Routes>
         </BrowserRouter>

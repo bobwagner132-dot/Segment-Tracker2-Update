@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Activity, Map, Route, Trophy, DatabaseBackup, LayoutDashboard } from "lucide-react";
+import { Activity, Map, Route, Trophy, DatabaseBackup, LayoutDashboard, Settings } from "lucide-react";
 import { ThemeToggle } from "@/lib/theme";
 
 const NAV = [
@@ -8,6 +8,7 @@ const NAV = [
   { to: "/rides", label: "Rides", icon: Route, testid: "nav-rides" },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy, testid: "nav-leaderboards" },
   { to: "/backup", label: "Backup", icon: DatabaseBackup, testid: "nav-backup" },
+  { to: "/preferences", label: "Prefs", icon: Settings, testid: "nav-preferences" },
 ];
 
 export default function Layout() {
