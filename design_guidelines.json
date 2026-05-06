@@ -1,0 +1,107 @@
+{
+  "theme": "dark",
+  "archetype": "2 (Performance Pro)",
+  "vibe": "Elite Athleticism, Tactical, Precision, High-Contrast",
+  "typography": {
+    "headings": {
+      "family": "'Barlow Condensed', sans-serif",
+      "weights": ["600", "800"],
+      "styles": "uppercase, tracking-tight"
+    },
+    "body": {
+      "family": "'Manrope', sans-serif",
+      "weights": ["400", "500", "600"],
+      "styles": "geometric, high legibility for data"
+    },
+    "numbers": {
+      "family": "'Barlow Condensed', sans-serif",
+      "styles": "tabular-nums, tracking-tighter"
+    },
+    "scale": {
+      "h1": "text-5xl md:text-6xl tracking-tighter uppercase",
+      "h2": "text-3xl md:text-4xl tracking-tighter uppercase",
+      "h3": "text-xl md:text-2xl tracking-tight uppercase",
+      "body": "text-base text-white/70",
+      "small": "text-xs tracking-[0.2em] uppercase text-white/50",
+      "stat": "text-6xl md:text-7xl font-black tracking-tighter text-white"
+    }
+  },
+  "colors": {
+    "background": {
+      "page": "#050507",
+      "surface": "#0A0A0C",
+      "surfaceHover": "#141418"
+    },
+    "border": {
+      "default": "rgba(255,255,255,0.08)",
+      "focus": "#00E5FF"
+    },
+    "primary": {
+      "default": "#00E5FF",
+      "hover": "#66EDFF",
+      "text": "#000000"
+    },
+    "accent": {
+      "blaze": "#FF3B30",
+      "blazeDim": "rgba(255,59,48,0.2)",
+      "volt": "#CCFF00"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "rgba(255,255,255,0.65)",
+      "muted": "rgba(255,255,255,0.4)"
+    }
+  },
+  "surfaces_and_shadows": {
+    "strategy": "Grid Borders (The Technical Look) - No soft shadows. 1px solid borders.",
+    "cards": "bg-[#0A0A0C] border border-white/10 rounded-none md:rounded-sm",
+    "glass": "backdrop-blur-xl bg-black/60 border-b border-white/10 saturate-150",
+    "hover_state": "bg-[#141418] border-[#00E5FF]/50 transition-colors duration-200"
+  },
+  "layout": {
+    "spacing_scale": "Tailwind standard, but prioritize p-6 and p-8 for inner card padding.",
+    "grid_strategy": "MODE B: THE CONTROL ROOM GRID (Dense, Data Correlation). grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-4 or gap-6.",
+    "alignment": "Optical alignment, left-aligned data tables, tabular-nums for metrics."
+  },
+  "components_strategy": {
+    "buttons": "Sharp corners, flat colors. Primary: bg-[#00E5FF] text-black hover:bg-[#66EDFF] font-bold uppercase tracking-wide. Secondary: border border-white/20 bg-transparent hover:border-white/50 text-white.",
+    "tables": "Dense rows, border-b border-white/5, hover:bg-white/5. Tabular numbers for all times/power metrics.",
+    "map": "Leaflet MUST use 'CartoDB Dark Matter' tiles to blend with the dark tactical theme. (url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'). Segment paths should be #00E5FF (Cyan) and Ride paths #FF3B30 (Blaze) with opacity.",
+    "charts": "Recharts. Area charts for elevation. Fill gradient from #00E5FF (opacity 0.3) to transparent. Stroke #00E5FF.",
+    "file_upload": "Dashed border (border-white/20) area, p-12, hover:border-[#00E5FF] hover:bg-[#00E5FF]/5 transition-all."
+  },
+  "animations": {
+    "micro": "Hover states scale-up slightly on icon, border color shifts. Fast transitions (duration-150 ease-out).",
+    "page": "Staggered fade-in for dashboard widgets."
+  },
+  "media_assets": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1774646598677-cc38cb3cac00?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwxfHx0b3BvZ3JhcGhpY2FsJTIwbWFwJTIwZGFya3xlbnwwfHx8fDE3NzgwMzI3NTl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract blue topographic map with glowing lines",
+      "usage": "Use as a fixed, low-opacity (10-15%) background texture for the entire app or behind the hero/auth area if any."
+    },
+    "empty_state_image": {
+      "url": "https://images.unsplash.com/photo-1699464386313-e444bee4b4dc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHwyfHxjeWNsaXN0JTIwZGFyayUyMHJvYWQlMjBzcHJpbnR8ZW58MHx8fHwxNzc4MDMyNzQ4fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Cyclist in the dark riding fast",
+      "usage": "Use for 'No Rides Uploaded' or empty dashboard states. Overlay with black gradient."
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Technical, 1.5px stroke, always pair with text labels in navigation."
+  },
+  "testing": {
+    "data_testid_requirement": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case."
+  },
+  "instructions_to_main_agent": [
+    "Build a React frontend with Tailwind CSS.",
+    "Install and use 'Barlow Condensed' (Google Fonts) for headings/numbers and 'Manrope' for body.",
+    "Setup Leaflet map strictly with CartoDB Dark Matter tiles so it doesn't break the dark theme.",
+    "For Shadcn components, override the rounded corners to be rounded-sm or rounded-none and enforce the 1px subtle border aesthetic.",
+    "Use Phosphor or Lucide icons for data labels (power, HR, speed, elevation).",
+    "Ensure GPX/FIT uploads have a very distinct dropzone area following the tactical theme.",
+    "Implement the 'Control Room Grid' spacing: highly dense data cards but clear typography scale.",
+    "No gradients on buttons or text. Use solid high-impact colors (#00E5FF).",
+    "Include empty states using the provided 'empty_state_image' with heavy dark overlays to maintain the elite vibe."
+  ]
+}
