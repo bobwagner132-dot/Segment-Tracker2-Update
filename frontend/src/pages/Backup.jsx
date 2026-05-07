@@ -109,12 +109,13 @@ export default function Backup() {
       <div className="border border-line-subtle bg-black/30 p-6 text-xs text-muted space-y-2">
         <div className="text-[10px] tracking-[0.3em] uppercase text-secondary">About Local Storage</div>
         <p>
-          All data is persisted in your local MongoDB instance and served only by the backend running
-          alongside the app. No third-party services are contacted.
+          All data is persisted in your browser's <code className="text-accent">IndexedDB</code>{" "}
+          (database <code className="text-accent">cst2</code>) on this device. Nothing is sent to a
+          server — everything works offline once the app has loaded.
         </p>
         <p>
-          To back up for disaster recovery (e.g. Time Machine), run the export regularly and save the
-          JSON file to a backed-up folder.
+          For disaster recovery (e.g. clearing browser data, switching Macs, Time Machine) run the
+          export regularly and save the JSON file to a backed-up folder.
         </p>
       </div>
     </div>

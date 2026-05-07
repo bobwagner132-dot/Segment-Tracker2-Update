@@ -1,83 +1,435 @@
-import axios from "axios";
+// Local-first data layer for Cycling Segment Tracker 2.
+// All former HTTP endpoints (FastAPI /api/...) are now implemented directly
+// against IndexedDB via ./localdb, preserving the exact function signatures
+// used by every page so the UI layer is unchanged.
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-export const API = `${BACKEND_URL}/api`;
+import { parseGpx, parseFit } from "./parsers";
+import {
+  DETECTION_RADIUS_M,
+  MAX_DISPLAY_POINTS,
+  decimate,
+  detectEfforts,
+  elevationGainM,
+  hashRide,
+  hashSegment,
+  totalDistanceM,
+} from "./detector";
+import {
+  bulkInsert,
+  clearAll,
+  count,
+  deleteEffortsBy,
+  findByIndex,
+  findOneByIndex,
+  getAll,
+  getOne,
+  put,
+  remove,
+  updateEffortsRideName,
+} from "./localdb";
+import { reverseGeocode } from "./geocode";
 
-export const api = axios.create({
-  baseURL: API,
-});
+// Re-exported for parity / external use
+export { DETECTION_RADIUS_M, MAX_DISPLAY_POINTS };
 
+function uuid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  // Fallback — shouldn't be hit in any modern browser
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+async function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("File read failed"));
+    reader.readAsText(file);
+  });
+}
+
+async function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("File read failed"));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+class ApiError extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.name = "ApiError";
+    // Shape matches axios errors so existing `e?.response?.data?.detail` paths keep working
+    this.response = { data: { detail: message }, status };
+  }
+}
+
+// ---------- Segments ----------
 export async function listSegments() {
-  const { data } = await api.get("/segments");
-  return data;
-}
-export async function getSegment(id) {
-  const { data } = await api.get(`/segments/${id}`);
-  return data;
-}
-export async function uploadSegment(file) {
-  const form = new FormData();
-  form.append("file", file);
-  const { data } = await api.post("/segments", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return data;
-}
-export async function deleteSegment(id) {
-  const { data } = await api.delete(`/segments/${id}`);
-  return data;
+  const segs = await getAll("segments");
+  segs.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  return segs.map((s) => ({
+    id: s.id,
+    name: s.name,
+    distance_m: s.distance_m,
+    elevation_gain_m: s.elevation_gain_m,
+    created_at: s.created_at,
+    point_count: s.points.length,
+  }));
 }
 
-export async function listRides() {
-  const { data } = await api.get("/rides");
-  return data;
+export async function getSegment(id) {
+  const s = await getOne("segments", id);
+  if (!s) throw new ApiError("Segment not found", 404);
+  return {
+    id: s.id,
+    name: s.name,
+    distance_m: s.distance_m,
+    elevation_gain_m: s.elevation_gain_m,
+    created_at: s.created_at,
+    point_count: s.points.length,
+    points: decimate(s.points),
+  };
 }
-export async function getRide(id) {
-  const { data } = await api.get(`/rides/${id}`);
-  return data;
+
+export async function uploadSegment(file) {
+  const fname = (file.name || "").toLowerCase();
+  if (!fname.endsWith(".gpx")) throw new ApiError("Segment must be a GPX file");
+  let parsed;
+  try {
+    const text = await readFileAsText(file);
+    parsed = parseGpx(text);
+  } catch (e) {
+    throw new ApiError(`GPX parse error: ${e.message || e}`);
+  }
+  if (parsed.points.length < 2) throw new ApiError("Segment has too few points");
+
+  const h = await hashSegment(parsed.points);
+  const existing = await findOneByIndex("segments", "hash", h);
+  if (existing) throw new ApiError("Duplicate segment", 409);
+
+  const id = uuid();
+  const doc = {
+    id,
+    name: parsed.name || file.name.replace(/\.gpx$/i, ""),
+    hash: h,
+    points: parsed.points,
+    distance_m: Math.round(totalDistanceM(parsed.points) * 10) / 10,
+    elevation_gain_m: Math.round(elevationGainM(parsed.points) * 10) / 10,
+    created_at: new Date().toISOString(),
+  };
+  await put("segments", doc);
+
+  // Detect this new segment against every existing ride
+  const rides = await getAll("rides");
+  for (const r of rides) {
+    const newEfforts = detectEfforts(r.points, doc);
+    for (const eff of newEfforts) {
+      await put("efforts", {
+        id: uuid(),
+        segment_id: id,
+        ride_id: r.id,
+        ride_name: r.name,
+        elapsed_s: eff.elapsed_s,
+        avg_power: eff.avg_power,
+        avg_hr: eff.avg_hr,
+        datetime_utc: eff.datetime_utc,
+        start_idx: eff.start_idx,
+        end_idx: eff.end_idx,
+      });
+    }
+  }
+
+  return {
+    id,
+    name: doc.name,
+    distance_m: doc.distance_m,
+    elevation_gain_m: doc.elevation_gain_m,
+    created_at: doc.created_at,
+    point_count: doc.points.length,
+    points: decimate(doc.points),
+  };
 }
-export async function uploadRide(file) {
-  const form = new FormData();
-  form.append("file", file);
-  const { data } = await api.post("/rides", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return data;
-}
-export async function deleteRide(id) {
-  const { data } = await api.delete(`/rides/${id}`);
-  return data;
+
+export async function deleteSegment(id) {
+  const existing = await getOne("segments", id);
+  if (!existing) throw new ApiError("Segment not found", 404);
+  await remove("segments", id);
+  await deleteEffortsBy("segment_id", id);
+  return { ok: true };
 }
 
 export async function renameSegment(id, name) {
-  const { data } = await api.patch(`/segments/${id}`, { name });
-  return data;
+  const trimmed = (name || "").trim();
+  if (!trimmed) throw new ApiError("Name cannot be empty");
+  const s = await getOne("segments", id);
+  if (!s) throw new ApiError("Segment not found", 404);
+  s.name = trimmed;
+  await put("segments", s);
+  return { ok: true, name: trimmed };
 }
+
+// ---------- Rides ----------
+export async function listRides() {
+  const [rides, efforts] = await Promise.all([getAll("rides"), getAll("efforts")]);
+  const counts = {};
+  for (const e of efforts) counts[e.ride_id] = (counts[e.ride_id] || 0) + 1;
+  rides.sort(
+    (a, b) =>
+      (b.start_time || b.created_at || "").localeCompare(a.start_time || a.created_at || "")
+  );
+  return rides.map((r) => ({
+    id: r.id,
+    name: r.name,
+    source_type: r.source_type,
+    start_time: r.start_time || null,
+    duration_s: r.duration_s || 0,
+    distance_m: r.distance_m || 0,
+    elevation_gain_m:
+      r.elevation_gain_m != null
+        ? r.elevation_gain_m
+        : Math.round(elevationGainM(r.points) * 10) / 10,
+    point_count: r.points.length,
+    created_at: r.created_at,
+    effort_count: counts[r.id] || 0,
+  }));
+}
+
+export async function getRide(id) {
+  const r = await getOne("rides", id);
+  if (!r) throw new ApiError("Ride not found", 404);
+  const efforts = await findByIndex("efforts", "ride_id", id);
+  const pts = r.points;
+  const segCache = {};
+  for (const e of efforts) {
+    if (
+      Number.isInteger(e.start_idx) &&
+      Number.isInteger(e.end_idx) &&
+      e.start_idx >= 0 &&
+      e.start_idx <= e.end_idx &&
+      e.end_idx < pts.length
+    ) {
+      e.points = decimate(pts.slice(e.start_idx, e.end_idx + 1), 500);
+    }
+    if (e.segment_id) {
+      if (!(e.segment_id in segCache)) {
+        const seg = await getOne("segments", e.segment_id);
+        segCache[e.segment_id] = seg ? seg.name : "Unknown segment";
+      }
+      e.segment_name = segCache[e.segment_id];
+    }
+  }
+  return {
+    id: r.id,
+    name: r.name,
+    source_type: r.source_type,
+    start_time: r.start_time || null,
+    duration_s: r.duration_s || 0,
+    distance_m: r.distance_m || 0,
+    elevation_gain_m:
+      r.elevation_gain_m != null
+        ? r.elevation_gain_m
+        : Math.round(elevationGainM(pts) * 10) / 10,
+    point_count: pts.length,
+    created_at: r.created_at,
+    effort_count: efforts.length,
+    points: decimate(pts),
+    efforts,
+  };
+}
+
+export async function uploadRide(file) {
+  const fname = (file.name || "").toLowerCase();
+  let parsed;
+  let sourceType;
+  if (fname.endsWith(".gpx")) {
+    const text = await readFileAsText(file);
+    try {
+      parsed = parseGpx(text);
+    } catch (e) {
+      throw new ApiError(`GPX parse error: ${e.message || e}`);
+    }
+    sourceType = "gpx";
+  } else if (fname.endsWith(".fit")) {
+    const ab = await readFileAsArrayBuffer(file);
+    try {
+      parsed = await parseFit(ab);
+    } catch (e) {
+      throw new ApiError(`FIT parse error: ${e.message || e}`);
+    }
+    sourceType = "fit";
+  } else {
+    throw new ApiError("Ride must be .gpx or .fit");
+  }
+
+  const points = parsed.points;
+  if (points.length < 2) throw new ApiError("Ride has too few points");
+
+  const h = await hashRide(points);
+  const existing = await findOneByIndex("rides", "hash", h);
+  if (existing) throw new ApiError("Duplicate ride", 409);
+
+  const startTime = points[0].t || null;
+  const endTime = points[points.length - 1].t || null;
+  let durationS = 0;
+  if (startTime && endTime) {
+    const dts = new Date(startTime);
+    const dte = new Date(endTime);
+    if (!Number.isNaN(dts.getTime()) && !Number.isNaN(dte.getTime())) {
+      durationS = (dte.getTime() - dts.getTime()) / 1000;
+    }
+  }
+
+  const rideId = uuid();
+
+  // Auto-name via Nominatim (best-effort, silent failure)
+  let autoName = null;
+  const place = await reverseGeocode(points[0].lat, points[0].lon);
+  if (place) autoName = `${place} Ride`;
+
+  const baseFilename = (file.name || "ride").replace(/\.[^.]+$/, "");
+  const parsedName = (parsed.name || "").trim();
+  const generic = new Set(["", "unnamed", "fit ride", "cycling ride", baseFilename.toLowerCase()]);
+  const useAuto =
+    autoName &&
+    (!parsedName ||
+      generic.has(parsedName.toLowerCase()) ||
+      parsedName.toLowerCase().endsWith("ride"));
+  const finalName = useAuto ? autoName : parsedName || baseFilename;
+
+  const rideDoc = {
+    id: rideId,
+    name: finalName,
+    hash: h,
+    source_type: sourceType,
+    start_time: startTime,
+    duration_s: durationS,
+    distance_m: Math.round(totalDistanceM(points) * 10) / 10,
+    elevation_gain_m: Math.round(elevationGainM(points) * 10) / 10,
+    points,
+    created_at: new Date().toISOString(),
+  };
+  await put("rides", rideDoc);
+
+  // Detect against all segments
+  const segs = await getAll("segments");
+  const allEfforts = [];
+  for (const seg of segs) {
+    const newEfforts = detectEfforts(points, seg);
+    for (const eff of newEfforts) {
+      const effDoc = {
+        id: uuid(),
+        segment_id: seg.id,
+        ride_id: rideId,
+        ride_name: rideDoc.name,
+        elapsed_s: eff.elapsed_s,
+        avg_power: eff.avg_power,
+        avg_hr: eff.avg_hr,
+        datetime_utc: eff.datetime_utc,
+        start_idx: eff.start_idx,
+        end_idx: eff.end_idx,
+      };
+      await put("efforts", effDoc);
+      allEfforts.push({
+        ...effDoc,
+        segment_name: seg.name,
+        points: decimate(points.slice(eff.start_idx, eff.end_idx + 1), 500),
+      });
+    }
+  }
+
+  return {
+    id: rideId,
+    name: rideDoc.name,
+    source_type: sourceType,
+    start_time: startTime,
+    duration_s: durationS,
+    distance_m: rideDoc.distance_m,
+    elevation_gain_m: rideDoc.elevation_gain_m,
+    point_count: points.length,
+    created_at: rideDoc.created_at,
+    effort_count: allEfforts.length,
+    points: decimate(points),
+    efforts: allEfforts,
+  };
+}
+
+export async function deleteRide(id) {
+  const existing = await getOne("rides", id);
+  if (!existing) throw new ApiError("Ride not found", 404);
+  await remove("rides", id);
+  await deleteEffortsBy("ride_id", id);
+  return { ok: true };
+}
+
 export async function renameRide(id, name) {
-  const { data } = await api.patch(`/rides/${id}`, { name });
-  return data;
+  const trimmed = (name || "").trim();
+  if (!trimmed) throw new ApiError("Name cannot be empty");
+  const r = await getOne("rides", id);
+  if (!r) throw new ApiError("Ride not found", 404);
+  r.name = trimmed;
+  await put("rides", r);
+  await updateEffortsRideName(id, trimmed);
+  return { ok: true, name: trimmed };
 }
 
+// ---------- Efforts ----------
 export async function listEfforts(segmentId) {
-  const { data } = await api.get(`/segments/${segmentId}/efforts`);
-  return data;
+  const efforts = await findByIndex("efforts", "segment_id", segmentId);
+  efforts.sort((a, b) => a.elapsed_s - b.elapsed_s);
+  return efforts;
 }
 
+// ---------- Stats ----------
 export async function getStats() {
-  const { data } = await api.get("/stats");
-  return data;
+  const [segments, rides, efforts] = await Promise.all([
+    count("segments"),
+    count("rides"),
+    count("efforts"),
+  ]);
+  return { segments, rides, efforts };
 }
 
+// ---------- Backup / Restore ----------
 export async function downloadBackup() {
-  const { data } = await api.get("/backup");
-  return data;
-}
-export async function restoreBackup(payload) {
-  const { data } = await api.post("/restore", payload);
-  return data;
+  const [segments, rides, efforts] = await Promise.all([
+    getAll("segments"),
+    getAll("rides"),
+    getAll("efforts"),
+  ]);
+  return {
+    version: 1,
+    exported_at: new Date().toISOString(),
+    segments,
+    rides,
+    efforts,
+  };
 }
 
-// ---- formatters ----
+export async function restoreBackup(payload) {
+  if (!payload || typeof payload !== "object") throw new ApiError("Invalid backup payload");
+  const segments = Array.isArray(payload.segments) ? payload.segments : [];
+  const rides = Array.isArray(payload.rides) ? payload.rides : [];
+  const efforts = Array.isArray(payload.efforts) ? payload.efforts : [];
+
+  await clearAll();
+  await bulkInsert("segments", segments);
+  await bulkInsert("rides", rides);
+  await bulkInsert("efforts", efforts);
+
+  return {
+    ok: true,
+    segments: segments.length,
+    rides: rides.length,
+    efforts: efforts.length,
+  };
+}
+
+// ---------- Formatters (unchanged, re-exported) ----------
 export function fmtTime(seconds) {
   if (seconds == null || isNaN(seconds)) return "—";
   const s = Math.round(seconds);
@@ -87,11 +439,13 @@ export function fmtTime(seconds) {
   if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
+
 export function fmtDistance(m) {
   if (m == null) return "—";
   if (m >= 1000) return `${(m / 1000).toFixed(2)} km`;
   return `${Math.round(m)} m`;
 }
+
 export function fmtDateLocal(iso) {
   if (!iso) return "—";
   try {
@@ -105,6 +459,7 @@ export function fmtDateLocal(iso) {
     return iso;
   }
 }
+
 export function localYear(iso) {
   if (!iso) return null;
   try {
