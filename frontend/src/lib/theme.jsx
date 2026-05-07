@@ -1,7 +1,21 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 
-const ThemeContext = createContext({ theme: "dark", toggle: () => {} });
+export const MAP_STYLES = {
+  auto: { label: "Auto (match theme)" },
+  dark: { label: "Dark (CartoDB)" },
+  light: { label: "Light (CartoDB)" },
+  standard: { label: "OpenStreetMap" },
+  terrain: { label: "Terrain (OpenTopo)" },
+};
+
+const ThemeContext = createContext({
+  theme: "dark",
+  toggle: () => {},
+  setTheme: () => {},
+  mapStyle: "auto",
+  setMapStyle: () => {},
+});
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
@@ -9,6 +23,13 @@ export function ThemeProvider({ children }) {
       return localStorage.getItem("cst-theme") || "dark";
     } catch {
       return "dark";
+    }
+  });
+  const [mapStyle, setMapStyle] = useState(() => {
+    try {
+      return localStorage.getItem("cst-map-style") || "auto";
+    } catch {
+      return "auto";
     }
   });
 
@@ -21,10 +42,20 @@ export function ThemeProvider({ children }) {
     }
   }, [theme]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("cst-map-style", mapStyle);
+    } catch {
+      /* empty */
+    }
+  }, [mapStyle]);
+
   const value = {
     theme,
     toggle: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
     setTheme,
+    mapStyle,
+    setMapStyle,
   };
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

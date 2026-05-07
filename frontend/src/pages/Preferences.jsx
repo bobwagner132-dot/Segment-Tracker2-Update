@@ -1,9 +1,9 @@
 import { Switch } from "@/components/ui/switch";
-import { useTheme } from "@/lib/theme";
-import { Moon, Sun, Palette, Database, Info } from "lucide-react";
+import { useTheme, MAP_STYLES } from "@/lib/theme";
+import { Moon, Sun, Palette, Database, Info, Map as MapIcon, BookOpen } from "lucide-react";
 
 export default function Preferences() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, mapStyle, setMapStyle } = useTheme();
   const isDark = theme === "dark";
 
   return (
@@ -94,6 +94,42 @@ export default function Preferences() {
         </div>
       </section>
 
+      {/* Map Section */}
+      <section className="border border-line bg-surface" data-testid="prefs-map">
+        <header className="px-6 py-4 border-b border-line-subtle flex items-center gap-3">
+          <MapIcon className="w-4 h-4 text-accent" strokeWidth={1.8} />
+          <div className="font-display font-bold uppercase tracking-tight">Map style</div>
+        </header>
+        <div className="p-6 space-y-4">
+          <div className="text-xs text-secondary">
+            Choose how the map renders for segments and rides. <span className="text-accent">Auto</span>{" "}
+            follows the background mode (CartoDB Dark / Light).
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {Object.entries(MAP_STYLES).map(([key, cfg]) => (
+              <button
+                key={key}
+                onClick={() => setMapStyle(key)}
+                data-testid={`prefs-map-${key}`}
+                className={`text-left border p-3 transition-colors ${
+                  mapStyle === key ? "border-accent bg-accent-5" : "border-line hover:border-line-strong"
+                }`}
+              >
+                <MapTilePreview styleKey={key} theme={theme} />
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide truncate">
+                    {cfg.label}
+                  </div>
+                  {mapStyle === key && (
+                    <span className="text-[9px] tracking-[0.3em] uppercase text-accent">●</span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Detection Section (read-only info) */}
       <section className="border border-line bg-surface" data-testid="prefs-detection">
         <header className="px-6 py-4 border-b border-line-subtle flex items-center gap-3">
@@ -118,6 +154,47 @@ export default function Preferences() {
               All efforts are grouped by year using your device's local time zone.
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* How-to Section */}
+      <section className="border border-line bg-surface" data-testid="prefs-howto">
+        <header className="px-6 py-4 border-b border-line-subtle flex items-center gap-3">
+          <BookOpen className="w-4 h-4 text-accent" strokeWidth={1.8} />
+          <div className="font-display font-bold uppercase tracking-tight">How to use</div>
+        </header>
+        <div className="p-6 space-y-4 text-sm text-secondary leading-relaxed">
+          <p data-testid="howto-instruction">
+            Create a route in your favourite software (
+            <span className="text-main font-semibold">Strava</span>,{" "}
+            <span className="text-main font-semibold">Ride with GPS</span>,{" "}
+            <span className="text-main font-semibold">Garmin Connect</span>, etc.) then export it as
+            a <span className="text-accent font-semibold">GPX</span> file and upload it as a{" "}
+            <span className="text-main font-semibold">Segment</span>. You can then upload your ride
+            as a <span className="text-main font-semibold">Ride</span> as either a{" "}
+            <span className="text-accent font-semibold">.fit</span> or{" "}
+            <span className="text-accent font-semibold">.gpx</span> file.
+          </p>
+          <ol className="list-decimal list-inside space-y-2 text-xs text-secondary">
+            <li>
+              Build a target route (e.g. a climb you train on) in your usual app and export the GPX.
+            </li>
+            <li>
+              Open <span className="text-accent">Segments</span> here and drop the GPX into the
+              upload zone.
+            </li>
+            <li>
+              After your real ride, export the file from your bike computer or app (.FIT preferred,
+              .GPX also fine) and drop it in <span className="text-accent">Rides</span>.
+            </li>
+            <li>
+              The app auto-detects whether your ride passed through the segment (within 30 m) and
+              records the time, average power and heart rate as an effort.
+            </li>
+            <li>
+              Compare runs across years on the <span className="text-accent">Leaderboards</span> tab.
+            </li>
+          </ol>
         </div>
       </section>
 
@@ -158,5 +235,23 @@ function ThemePreview({ label, active, onClick, palette, testid }) {
         )}
       </div>
     </button>
+  );
+}
+
+function MapTilePreview({ styleKey, theme }) {
+  const effectiveKey = styleKey === "auto" ? theme : styleKey;
+  const SWATCHES = {
+    dark: ["#0F1117", "#1E2128", "#2C313A"],
+    light: ["#E8EBEF", "#D4D9DF", "#BFC4CC"],
+    standard: ["#F2EFE9", "#C8D8AF", "#A4C7D8"],
+    terrain: ["#F1ECDA", "#C3BB94", "#7FA268"],
+  };
+  const swatch = SWATCHES[effectiveKey] || SWATCHES.dark;
+  return (
+    <div className="h-12 grid grid-cols-3 border border-line-subtle">
+      {swatch.map((c) => (
+        <div key={c} style={{ background: c }} />
+      ))}
+    </div>
   );
 }

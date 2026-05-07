@@ -20,10 +20,22 @@ const TILE_CONFIG = {
   dark: {
     url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
     attribution: "&copy; OSM &copy; CARTO",
+    subdomains: "abcd",
   },
   light: {
     url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
     attribution: "&copy; OSM &copy; CARTO",
+    subdomains: "abcd",
+  },
+  standard: {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "&copy; OpenStreetMap contributors",
+    subdomains: "abc",
+  },
+  terrain: {
+    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    attribution: "&copy; OpenTopoMap (CC-BY-SA) &copy; OSM",
+    subdomains: "abc",
   },
 };
 
@@ -35,7 +47,7 @@ export default function MapView({
   height = 420,
   testid = "map-view",
 }) {
-  const { theme } = useTheme();
+  const { theme, mapStyle } = useTheme();
   const positions = useMemo(() => points.map((p) => [p.lat, p.lon]), [points]);
   const overlayPositions = useMemo(
     () => (overlayPoints ? overlayPoints.map((p) => [p.lat, p.lon]) : []),
@@ -56,7 +68,8 @@ export default function MapView({
 
   const start = positions[0];
   const end = positions[positions.length - 1];
-  const tile = TILE_CONFIG[theme] || TILE_CONFIG.dark;
+  const styleKey = mapStyle === "auto" ? theme : mapStyle;
+  const tile = TILE_CONFIG[styleKey] || TILE_CONFIG.dark;
 
   return (
     <div
@@ -65,12 +78,18 @@ export default function MapView({
       style={{ height }}
     >
       <MapContainer
+        key={`${styleKey}`}
         center={start}
         zoom={13}
         scrollWheelZoom
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer url={tile.url} attribution={tile.attribution} subdomains="abcd" maxZoom={19} />
+        <TileLayer
+          url={tile.url}
+          attribution={tile.attribution}
+          subdomains={tile.subdomains}
+          maxZoom={19}
+        />
         <Polyline positions={positions} pathOptions={{ color, weight: 4, opacity: 0.9 }} />
         {overlayPositions.length > 0 && (
           <Polyline

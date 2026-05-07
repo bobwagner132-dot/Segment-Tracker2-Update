@@ -14,7 +14,7 @@ import {
   fmtTime,
   fmtDateLocal,
 } from "../lib/api";
-import { Trash2, Route as RouteIcon, Clock } from "lucide-react";
+import { Trash2, Route as RouteIcon, Clock, Mountain } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Rides() {
@@ -172,7 +172,11 @@ export default function Rides() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                   <Stat label="Distance" value={fmtDistance(selected.distance_m)} />
                   <Stat label="Duration" value={fmtTime(selected.duration_s)} icon={Clock} />
-                  <Stat label="Points" value={selected.point_count} />
+                  <Stat
+                    label="Elev Gain"
+                    value={`+${Math.round(selected.elevation_gain_m || 0)} m`}
+                    icon={Mountain}
+                  />
                   <Stat label="Efforts" value={selected.effort_count} />
                 </div>
               </div>

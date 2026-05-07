@@ -314,6 +314,53 @@ class TestRenameAndRideDetail:
         assert r.status_code == 404
 
 
+class TestNewFeaturesIter3:
+    """Iteration 3: elevation_gain_m on ride responses + auto-name via Nominatim."""
+
+    def _london_ride(self):
+        t0 = datetime(2024, 7, 1, 9, 0, 0, tzinfo=timezone.utc)
+        pts = [
+            (51.50740, -0.12780, 30, iso(t0)),
+            (51.50750, -0.12770, 32, iso(t0 + timedelta(seconds=30))),
+            (51.50760, -0.12760, 35, iso(t0 + timedelta(seconds=60))),
+            (51.50770, -0.12750, 40, iso(t0 + timedelta(seconds=90))),
+            (51.50780, -0.12740, 50, iso(t0 + timedelta(seconds=120))),
+        ]
+        return build_gpx(pts, name="Unnamed")
+
+    def test_upload_ride_returns_elevation_gain(self, client):
+        files = {"file": ("london.gpx", self._london_ride(), "application/gpx+xml")}
+        r = client.post(f"{API}/rides", files=files, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "elevation_gain_m" in d
+        assert isinstance(d["elevation_gain_m"], (int, float))
+        # 30->32->35->40->50 = +20m
+        assert d["elevation_gain_m"] >= 19.9
+        # auto-name: best-effort (Nominatim may rate-limit). If it succeeded, name starts with "Ride from "
+        if d["name"].startswith("Ride from "):
+            assert len(d["name"]) > len("Ride from ")
+            print(f"Auto-name OK: {d['name']}")
+        else:
+            print(f"Nominatim fallback name: {d['name']}")
+        pytest.iter3_ride_id = d["id"]
+
+    def test_list_rides_has_elevation_gain(self, client):
+        r = client.get(f"{API}/rides", timeout=15)
+        assert r.status_code == 200
+        rides = r.json()
+        assert len(rides) >= 1
+        for rd in rides:
+            assert "elevation_gain_m" in rd
+            assert isinstance(rd["elevation_gain_m"], (int, float))
+
+    def test_get_ride_has_elevation_gain(self, client):
+        r = client.get(f"{API}/rides/{pytest.iter3_ride_id}", timeout=15)
+        assert r.status_code == 200
+        d = r.json()
+        assert "elevation_gain_m" in d and d["elevation_gain_m"] >= 19.9
+
+
 class TestDeletion:
     def test_delete_ride_cascades_efforts(self, client):
         rid = pytest.ride_id

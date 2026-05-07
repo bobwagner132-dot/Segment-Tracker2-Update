@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 
 import gpxpy
 from fitparse import FitFile
+import httpx
 
 
 ROOT_DIR = Path(__file__).parent
@@ -177,6 +178,38 @@ def hash_segment(points: List[Dict[str, Any]]) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
+async def reverse_geocode(lat: float, lon: float) -> Optional[str]:
+    """Best-effort reverse geocode via OSM Nominatim. Returns place name or None."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={"lat": lat, "lon": lon, "format": "json", "zoom": 14},
+                headers={
+                    "User-Agent": "CyclingSegmentTracker2/1.0",
+                    "Accept-Language": "en",
+                },
+            )
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+            addr = data.get("address", {}) or {}
+            place = (
+                addr.get("city")
+                or addr.get("town")
+                or addr.get("village")
+                or addr.get("suburb")
+                or addr.get("neighbourhood")
+                or addr.get("hamlet")
+                or addr.get("county")
+                or addr.get("state")
+            )
+            return place
+    except Exception as e:
+        logger.warning(f"Reverse geocode failed: {e}")
+        return None
+
+
 def hash_ride(points: List[Dict[str, Any]]) -> str:
     # Include timestamps if available for uniqueness
     parts = []
@@ -306,6 +339,7 @@ class RideSummary(BaseModel):
     start_time: Optional[str]
     duration_s: float
     distance_m: float
+    elevation_gain_m: float = 0.0
     point_count: int
     created_at: str
     effort_count: int
@@ -455,14 +489,33 @@ async def upload_ride(file: UploadFile = File(...)):
             pass
 
     ride_id = str(uuid.uuid4())
+
+    # Auto-name based on starting place via reverse geocode (best-effort)
+    auto_name = None
+    if points:
+        place = await reverse_geocode(points[0]["lat"], points[0]["lon"])
+        if place:
+            auto_name = f"Ride from {place}"
+
+    base_filename = (file.filename or "ride").rsplit(".", 1)[0]
+    parsed_name = (parsed.get("name") or "").strip()
+    generic_markers = {"", "unnamed", "fit ride", "cycling ride", base_filename.lower()}
+    use_auto = auto_name and (
+        not parsed_name
+        or parsed_name.lower() in generic_markers
+        or parsed_name.lower().endswith("ride")
+    )
+    final_name = auto_name if use_auto else (parsed_name or base_filename)
+
     ride_doc = {
         "id": ride_id,
-        "name": parsed["name"] or file.filename,
+        "name": final_name,
         "hash": h,
         "source_type": source_type,
         "start_time": start_time,
         "duration_s": duration_s,
         "distance_m": round(total_distance_m(points), 1),
+        "elevation_gain_m": round(elevation_gain_m(points), 1),
         "points": points,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -502,6 +555,7 @@ async def upload_ride(file: UploadFile = File(...)):
         start_time=start_time,
         duration_s=duration_s,
         distance_m=ride_doc["distance_m"],
+        elevation_gain_m=ride_doc["elevation_gain_m"],
         point_count=len(points),
         created_at=ride_doc["created_at"],
         effort_count=len(all_efforts),
@@ -526,6 +580,7 @@ async def list_rides():
             start_time=r.get("start_time"),
             duration_s=r.get("duration_s", 0),
             distance_m=r.get("distance_m", 0),
+            elevation_gain_m=r.get("elevation_gain_m") if r.get("elevation_gain_m") is not None else round(elevation_gain_m(r["points"]), 1),
             point_count=len(r["points"]),
             created_at=r["created_at"],
             effort_count=counts.get(r["id"], 0),
@@ -561,6 +616,7 @@ async def get_ride(ride_id: str):
         start_time=r.get("start_time"),
         duration_s=r.get("duration_s", 0),
         distance_m=r.get("distance_m", 0),
+        elevation_gain_m=r.get("elevation_gain_m") if r.get("elevation_gain_m") is not None else round(elevation_gain_m(pts), 1),
         point_count=len(pts),
         created_at=r["created_at"],
         effort_count=len(efforts),

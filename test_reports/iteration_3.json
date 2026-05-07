@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 3 — verified the 4 new changes: (1) OSM map style selector + persistence, (2) auto-name uploaded rides via Nominatim reverse geocode, (3) replaced 'Points' stat with 'Total Elevation Gain' on Rides detail, (4) added 'How to use' instructional section in Preferences. Backend pytest extended 24 → 27 tests, ALL 27 PASS. Frontend Playwright validated all data-testids, localStorage persistence + reload, and live OSM tile fetch (tile.openstreetmap.org) on /rides.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Carry-over from iter 1 & 2, still open) Leaderboards default-year falls back to current year (2026) so existing efforts in older years remain hidden until manually picking the year. Set the year to the most recent year present in efforts.",
+    "(Carry-over from iter 1 & 2, still open) Recharts ResponsiveContainer logs 'width(-1)/height(-1)' twice per ride/segment view — cosmetic.",
+    "(Carry-over from iter 2) Optional: make EditableName pencil button visible on focus-within / for touch devices."
+  ],
+  "critical_code_review_comments": [
+    "server.reverse_geocode() correctly uses User-Agent + 5s timeout + try/except + structured fallback. Verified live: lat 51.5074, lon -0.1278 returned 'City of Westminster' → 'Ride from City of Westminster'.",
+    "auto_name override logic in upload_ride is sensible: only overrides when parsed name is empty/generic ('unnamed', 'fit ride', 'cycling ride', filename-based, or ends with 'ride'). This protects user-named GPX exports.",
+    "RideSummary.elevation_gain_m has default 0.0 (good for legacy docs); list_rides + get_ride both fall back to recomputing from points if missing — solid migration path.",
+    "MapView keys MapContainer by styleKey so the tile URL change forces a remount (Leaflet TileLayer doesn't hot-swap props well) — verified network requests switched cleanly to tile.openstreetmap.org.",
+    "theme.jsx persists both cst-theme and cst-map-style in separate effects with try/catch — SSR-safe.",
+    "Minor nit: reverse_geocode is called synchronously inline in upload_ride. If Nominatim is slow (5s timeout) the upload UX will block. Consider firing it in a background task and PATCHing the ride name when it resolves. Non-blocking for current scope.",
+    "Minor nit: Preferences.jsx 'About' section text says 'Theme preference is saved to localStorage (key cst-theme)' but does not mention the new cst-map-style key. Minor doc inconsistency."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestNewFeaturesIter3 class with 3 new tests covering elevation_gain_m on POST/GET list/GET detail and auto-name verification)"
+  ],
+  "success_rate": {
+    "backend": "100% (27/27)",
+    "frontend": "100% on tested flows (5 map-style buttons present + clickable, prefs-howto section with all 5 keywords, localStorage 'cst-map-style' persists across reload, /rides shows 'Elev Gain +35 m' tile (no 'Points'), live tile.openstreetmap.org requests when mapStyle=standard, auto-named ride 'Ride from City of Westminster' rendered)"
+  },
+  "test_credentials": "N/A — app has no auth.",
+  "seed_data_creation": "Seeded 1 GPX ride near London (51.5074,-0.1278 → 51.5144,-0.1208, 8 timestamped points, +35m elevation gain) via POST /api/rides. Auto-name returned 'Ride from City of Westminster'. After UI verification the DB was wiped via /api/restore with empty payload.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pytest suite is 27 tests at /app/backend/tests/backend_test.py covering: TestStats, TestSegments (5), TestRidesAndEfforts (7), TestBackupRestore (2), TestRenameAndRideDetail (7), TestNewFeaturesIter3 (3 — elevation_gain_m + Nominatim auto-name), TestDeletion (2). Module-scoped clean_db fixture wipes DB at start AND end. Note: TestNewFeaturesIter3 must run BEFORE TestDeletion since the latter consumes pytest.seg_id / pytest.ride_id created earlier. The Nominatim reverse geocode WAS reachable during this test run (returned 'City of Westminster'); if rate-limited in future runs, test_upload_ride_returns_elevation_gain falls back gracefully (still PASS) and just logs the fallback name.",
+  "rca of the issue": "No new bugs found in iteration 3. All 4 requested changes work end-to-end: (1) Map style selector with 5 options persists to localStorage 'cst-map-style' and remounts MapContainer with new tile URL (tile.openstreetmap.org confirmed via network); (2) Nominatim reverse geocode of first GPS point produces 'Ride from <place>' (verified live: London coords → 'Ride from City of Westminster'); (3) Rides detail panel now shows 'Elev Gain' tile with Mountain icon and '+35 m' value, 'Points' stat is gone; (4) Preferences pane has new 'How to use' section [data-testid='prefs-howto'] containing instruction [data-testid='howto-instruction'] with all required keywords (Strava, Ride with GPS, Garmin Connect, .fit, .gpx)."
+}
