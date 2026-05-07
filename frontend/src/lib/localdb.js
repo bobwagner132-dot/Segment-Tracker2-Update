@@ -107,6 +107,23 @@ export async function deleteEffortsBy(indexName, value) {
   await tx.done;
 }
 
+// ---------- Meta key/value helpers ----------
+export async function getMeta(key) {
+  const db = await getDB();
+  const row = await db.get("meta", key);
+  return row ? row.value : null;
+}
+
+export async function setMeta(key, value) {
+  const db = await getDB();
+  return db.put("meta", { key, value });
+}
+
+export async function deleteMeta(key) {
+  const db = await getDB();
+  return db.delete("meta", key);
+}
+
 export async function updateEffortsRideName(rideId, name) {
   const db = await getDB();
   const tx = db.transaction("efforts", "readwrite");

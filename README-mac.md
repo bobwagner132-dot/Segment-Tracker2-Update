@@ -32,14 +32,19 @@ Both are persistent across browser restarts, Mac reboots, and software updates. 
 
 ## Backing up (**do this regularly**)
 
+The first time you click **Save Backup**, the browser asks you to pick a folder (e.g. `~/Documents/CyclingTracker`). The app remembers your choice and creates a `Backup/` subfolder inside it. Every subsequent export drops a timestamped JSON file in there — no folder picker, no Downloads dialog.
+
+To restore:
+
 1. Open the app → **Backup** tab.
-2. Click **Download Backup** — you get a single JSON file containing every ride, segment, and effort.
-3. Save it somewhere Time-Machine–backed (`~/Documents/`, `~/Dropbox/`, etc.).
+2. Click **Browse Backup folder** — the app reads the `Backup/` subfolder of your chosen directory and shows every snapshot, newest first.
+3. Click the snapshot you want; confirm; done.
 
-To restore on the same or a different Mac:
+> Browser support: the folder flow uses the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) which works in **Chrome, Edge, Brave, Arc** on macOS. **Safari and Firefox** fall back automatically — `Save Backup` triggers a normal download into `~/Downloads`, and `Restore` opens a single-file picker.
 
-1. Build & run the app (steps above).
-2. Open **Backup** → **Select JSON File** → pick your previous backup. All data is replaced with what's in the file.
+> Permissions: each browser session you open the app, the first export/restore re-prompts for folder access — this is enforced by the browser's security model and cannot be skipped. Click **Allow** once and the rest of the session is silent.
+
+> Recommended folder: pick something inside iCloud Drive / Dropbox / Time-Machine-protected `~/Documents` so backups are also off-device.
 
 ## Offline behaviour
 

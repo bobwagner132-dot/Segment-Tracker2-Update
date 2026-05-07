@@ -39,6 +39,13 @@ Single cyclist who wants Strava-like segment analytics kept 100% locally on thei
 - Auto-naming rides via OSM Nominatim reverse geocoding ("Suburb Ride")
 - Light/dark theme, map style picker persisted in localStorage
 
+### Feb 2026 — Folder-based backup/restore
+- Added File System Access API integration: pick a backup folder once, app creates `Backup/` subfolder inside it, all exports go there automatically with timestamped filenames
+- Restore now lists JSONs inside the chosen folder's `Backup/` subfolder, newest first, click to restore
+- Folder handle persisted via IndexedDB `meta` store; permission re-confirmed on first use per session
+- Graceful fallback for Safari/Firefox: classic download / file picker
+- New files: `src/lib/fsbackup.js`; updated `src/lib/localdb.js` (meta helpers); rewritten `src/pages/Backup.jsx`
+
 ### Feb 2026 — Local-first migration
 - Replaced FastAPI + MongoDB data layer with IndexedDB (via `idb`)
 - Ported GPX parser to browser DOMParser (`src/lib/parsers.js`)
