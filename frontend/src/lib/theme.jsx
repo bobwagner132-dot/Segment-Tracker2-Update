@@ -20,16 +20,16 @@ const ThemeContext = createContext({
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     try {
-      return localStorage.getItem("cst-theme") || "dark";
+      return localStorage.getItem("cst-theme") || "light";
     } catch {
-      return "dark";
+      return "light";
     }
   });
   const [mapStyle, setMapStyle] = useState(() => {
     try {
-      return localStorage.getItem("cst-map-style") || "auto";
+      return localStorage.getItem("cst-map-style") || "standard";
     } catch {
-      return "auto";
+      return "standard";
     }
   });
 
