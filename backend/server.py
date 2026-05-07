@@ -195,12 +195,13 @@ async def reverse_geocode(lat: float, lon: float) -> Optional[str]:
             data = resp.json()
             addr = data.get("address", {}) or {}
             place = (
-                addr.get("city")
-                or addr.get("town")
-                or addr.get("village")
-                or addr.get("suburb")
+                addr.get("suburb")
                 or addr.get("neighbourhood")
+                or addr.get("village")
                 or addr.get("hamlet")
+                or addr.get("town")
+                or addr.get("city_district")
+                or addr.get("city")
                 or addr.get("county")
                 or addr.get("state")
             )
@@ -495,7 +496,7 @@ async def upload_ride(file: UploadFile = File(...)):
     if points:
         place = await reverse_geocode(points[0]["lat"], points[0]["lon"])
         if place:
-            auto_name = f"Ride from {place}"
+            auto_name = f"{place} Ride"
 
     base_filename = (file.filename or "ride").rsplit(".", 1)[0]
     parsed_name = (parsed.get("name") or "").strip()
