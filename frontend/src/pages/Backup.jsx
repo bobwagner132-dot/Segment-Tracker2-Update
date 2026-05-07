@@ -24,6 +24,10 @@ import {
 } from "../lib/fsbackup";
 
 const FS_SUPPORTED = isFsAccessSupported();
+// File System Access API is blocked in cross-origin sub-frames (e.g. the Emergent
+// preview iframe). Detect this so we can show a helpful "open in new tab" hint.
+const IN_IFRAME = typeof window !== "undefined" && window.self !== window.top;
+const FS_USABLE = FS_SUPPORTED && !IN_IFRAME;
 
 export default function Backup() {
   const [busy, setBusy] = useState(false);
@@ -61,7 +65,7 @@ export default function Backup() {
     try {
       const data = await downloadBackup();
 
-      if (FS_SUPPORTED) {
+      if (FS_USABLE) {
         // Ensure we have a folder (prompt if none)
         const dir = await ensureBackupDir({ prompt: true });
         if (!dir) {
@@ -91,7 +95,7 @@ export default function Backup() {
   }
 
   async function handleRestoreFromFolder() {
-    if (!FS_SUPPORTED) {
+    if (!FS_USABLE) {
       // Fallback to file picker
       inputRef.current?.click();
       return;
@@ -180,7 +184,29 @@ export default function Backup() {
             <div className="font-display font-bold uppercase tracking-tight text-lg mb-1">
               Backup folder
             </div>
-            {FS_SUPPORTED ? (
+            {IN_IFRAME && FS_SUPPORTED ? (
+              <div className="text-xs text-secondary" data-testid="iframe-warning">
+                <span className="text-danger font-semibold">
+                  Folder picker disabled inside this embedded preview.
+                </span>{" "}
+                The browser blocks <code className="text-accent">showDirectoryPicker</code> in
+                cross-origin iframes. Open the app in its own tab to use the folder flow — or just
+                run it locally on your Mac via{" "}
+                <code className="text-accent">python3 -m http.server 8000</code> where iframes
+                aren't involved.
+                <div className="mt-3">
+                  <a
+                    href={typeof window !== "undefined" ? window.location.href : "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid="open-new-tab"
+                    className="inline-block border border-line-strong hover:border-accent text-main font-bold uppercase tracking-[0.2em] text-[10px] px-4 py-2"
+                  >
+                    Open in new tab
+                  </a>
+                </div>
+              </div>
+            ) : FS_USABLE ? (
               dirName ? (
                 <>
                   <div className="text-sm text-main truncate" data-testid="backup-dir-name">
@@ -208,7 +234,7 @@ export default function Backup() {
               </div>
             )}
           </div>
-          {FS_SUPPORTED && (
+          {FS_USABLE && (
             <div className="flex flex-col gap-2 flex-shrink-0">
               <button
                 onClick={handleChooseFolder}
@@ -239,7 +265,7 @@ export default function Backup() {
           <Download className="w-6 h-6 text-accent mb-4" strokeWidth={1.5} />
           <div className="font-display font-bold uppercase tracking-tight text-lg mb-2">Export</div>
           <p className="text-secondary text-xs tracking-wide mb-6">
-            {FS_SUPPORTED
+            {FS_USABLE
               ? dirName
                 ? `Writes a timestamped JSON into ${dirName}/${BACKUP_SUBFOLDER_NAME}/.`
                 : "Pick a folder on first export — we'll create a Backup/ subfolder there."
@@ -251,7 +277,7 @@ export default function Backup() {
             data-testid="export-btn"
             className="w-full bg-accent text-black font-bold uppercase tracking-[0.2em] text-xs py-3 accent-fill disabled:opacity-50"
           >
-            {busy ? "Working…" : FS_SUPPORTED ? "Save Backup" : "Download Backup"}
+            {busy ? "Working…" : FS_USABLE ? "Save Backup" : "Download Backup"}
           </button>
         </div>
 
@@ -259,7 +285,7 @@ export default function Backup() {
           <Upload className="w-6 h-6 text-danger mb-4" strokeWidth={1.5} />
           <div className="font-display font-bold uppercase tracking-tight text-lg mb-2">Restore</div>
           <p className="text-secondary text-xs tracking-wide mb-4">
-            {FS_SUPPORTED
+            {FS_USABLE
               ? `Looks inside ${BACKUP_SUBFOLDER_NAME}/ in your backup folder and lets you pick a snapshot.`
               : "Select any previously-exported JSON file."}
           </p>
@@ -283,11 +309,11 @@ export default function Backup() {
           >
             {busy
               ? "Working…"
-              : FS_SUPPORTED
+              : FS_USABLE
                 ? "Browse Backup folder"
                 : "Select JSON File"}
           </button>
-          {FS_SUPPORTED && (
+          {FS_USABLE && (
             <button
               onClick={() => inputRef.current?.click()}
               disabled={busy}
