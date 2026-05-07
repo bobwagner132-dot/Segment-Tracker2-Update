@@ -80,12 +80,21 @@ export default function EditableName({ value, onSave, testid = "editable-name", 
 
   return (
     <div className="flex items-start gap-3 group" data-testid={testid}>
-      <span className={className}>{value}</span>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        data-testid={`${testid}-text`}
+        title="Click to rename"
+        className={`text-left bg-transparent p-0 m-0 hover:text-accent transition-colors cursor-text ${className}`}
+      >
+        {value}
+      </button>
       <button
         onClick={() => setEditing(true)}
         data-testid={`${testid}-edit`}
-        className="mt-2 p-1 text-muted opacity-40 sm:opacity-30 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition-opacity"
+        title="Rename"
         aria-label="Rename"
+        className="mt-2 p-1 text-accent opacity-80 hover:opacity-100 hover:bg-subtle border border-line transition-opacity flex-shrink-0"
       >
         <Pencil className="w-4 h-4" />
       </button>
