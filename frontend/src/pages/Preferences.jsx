@@ -201,8 +201,9 @@ export default function Preferences() {
       <section className="border border-line-subtle bg-subtle p-6 flex items-start gap-3" data-testid="prefs-about">
         <Info className="w-4 h-4 text-muted mt-0.5 flex-shrink-0" />
         <div className="text-xs text-secondary">
-          Theme preference is saved to your browser's <code className="text-accent">localStorage</code>{" "}
-          (key <code className="text-accent">cst-theme</code>) and applies only to this device. Visit{" "}
+          Preferences are saved to your browser's <code className="text-accent">localStorage</code>{" "}
+          (keys <code className="text-accent">cst-theme</code> and{" "}
+          <code className="text-accent">cst-map-style</code>) and apply only to this device. Visit{" "}
           <span className="text-accent">Backup</span> to export your full database to JSON.
         </div>
       </section>
