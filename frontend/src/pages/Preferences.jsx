@@ -10,7 +10,7 @@ export default function Preferences() {
     <div className="space-y-8 animate-fade-up max-w-3xl" data-testid="preferences-page">
       <div>
         <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">
-          / / Preferences
+          / / Settings
         </div>
         <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
           Tune the cockpit

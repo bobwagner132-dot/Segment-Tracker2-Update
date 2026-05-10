@@ -11,8 +11,9 @@ import {
   uploadSegment,
   renameSegment,
   fmtDistance,
+  fmtGradient,
 } from "../lib/api";
-import { Trash2, MapPin, Mountain } from "lucide-react";
+import { Trash2, MapPin, Mountain, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Segments() {
@@ -160,7 +161,11 @@ export default function Segments() {
                     value={`+${Math.round(selected.elevation_gain_m)} m`}
                     icon={Mountain}
                   />
-                  <Stat label="Points" value={selected.point_count} />
+                  <Stat
+                    label="Avg Gradient"
+                    value={fmtGradient(selected.elevation_gain_m, selected.distance_m)}
+                    icon={TrendingUp}
+                  />
                 </div>
               </div>
               <MapView points={selected.points} color="#00E5FF" height={420} testid="segment-map" />

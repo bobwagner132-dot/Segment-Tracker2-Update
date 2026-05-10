@@ -113,11 +113,59 @@ export function parseGpx(text) {
 }
 
 // ---------- FIT ----------
+function pickDeviceLabel(infos) {
+  if (!infos || infos.length === 0) return null;
+  // Prefer the entry that looks like the head unit: highest priority is one
+  // with a product_name / garmin_product / manufacturer. Skip "sensor" types.
+  const sorted = [...infos].sort((a, b) => {
+    const score = (i) => {
+      let s = 0;
+      if (i.product_name) s += 4;
+      if (i.garmin_product) s += 3;
+      if (i.manufacturer && i.manufacturer !== "unknown") s += 2;
+      if (i.device_index === "creator" || i.device_index === 0) s += 5;
+      if ((i.source_type || "").toString() === "local") s += 1;
+      return s;
+    };
+    return score(b) - score(a);
+  });
+  for (const d of sorted) {
+    const product = d.product_name || d.garmin_product || d.product;
+    const manu = d.manufacturer && d.manufacturer !== "unknown" ? d.manufacturer : null;
+    if (product && manu) {
+      const m = String(manu).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      const p = String(product).replace(/_/g, " ");
+      // Avoid duplicating if product already contains manufacturer
+      return p.toLowerCase().includes(m.toLowerCase()) ? p : `${m} ${p}`;
+    }
+    if (product) return String(product).replace(/_/g, " ");
+    if (manu) return String(manu).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return null;
+}
+
+function pickBikeName(data) {
+  // Garmin sometimes stores per-bike profile names in `bike_profiles` or
+  // `workout` messages. fit-file-parser exposes whatever it sees verbatim.
+  const bp = data.bike_profiles || data.bike_profile;
+  if (Array.isArray(bp) && bp.length > 0) {
+    const named = bp.find((b) => b && b.name);
+    if (named) return named.name;
+  }
+  // Some files include user_profile.weight + bike-related fields; ignore.
+  return null;
+}
+
+function titleCase(s) {
+  if (!s) return null;
+  return String(s).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function parseFit(arrayBuffer) {
   return new Promise((resolve, reject) => {
     const fitParser = new FitParser({
       force: true,
-      speedUnit: "km/h",
+      speedUnit: "m/s",
       lengthUnit: "m",
       temperatureUnit: "celsius",
       elapsedRecordField: true,
@@ -147,17 +195,47 @@ export function parseFit(arrayBuffer) {
         if (r.heart_rate != null) pt.hr = Math.round(Number(r.heart_rate));
         if (r.power != null) pt.power = Math.round(Number(r.power));
         if (r.cadence != null) pt.cad = Math.round(Number(r.cadence));
+        if (r.speed != null) pt.speed = Number(r.speed);
+        else if (r.enhanced_speed != null) pt.speed = Number(r.enhanced_speed);
         points.push(pt);
       }
 
-      let name = null;
       const sessions = data.sessions || [];
-      if (sessions.length > 0 && sessions[0].sport) {
-        name = `${sessions[0].sport} ride`;
-      }
-      if (!name) name = "FIT Ride";
+      const session = sessions.length > 0 ? sessions[0] : {};
 
-      resolve({ name, points });
+      const sport = session.sport ? titleCase(session.sport) : null;
+      const subSport = session.sub_sport ? titleCase(session.sub_sport) : null;
+      const device = pickDeviceLabel(data.device_infos || data.devices || []);
+      const bikeName = pickBikeName(data);
+
+      const meta = {
+        sport,
+        sub_sport: subSport,
+        device,
+        bike_name: bikeName,
+        // Session aggregates (preferred over our re-computed values when present)
+        moving_time_s: session.total_timer_time != null ? Number(session.total_timer_time) : null,
+        elapsed_time_s: session.total_elapsed_time != null ? Number(session.total_elapsed_time) : null,
+        avg_speed_mps: session.avg_speed != null ? Number(session.avg_speed) : null,
+        max_speed_mps: session.max_speed != null ? Number(session.max_speed) : null,
+        avg_heart_rate: session.avg_heart_rate != null ? Number(session.avg_heart_rate) : null,
+        max_heart_rate: session.max_heart_rate != null ? Number(session.max_heart_rate) : null,
+        avg_cadence: session.avg_cadence != null ? Number(session.avg_cadence) : null,
+        max_cadence: session.max_cadence != null ? Number(session.max_cadence) : null,
+        avg_power: session.avg_power != null ? Number(session.avg_power) : null,
+        max_power: session.max_power != null ? Number(session.max_power) : null,
+        normalized_power: session.normalized_power != null ? Number(session.normalized_power) : null,
+        total_ascent_m: session.total_ascent != null ? Number(session.total_ascent) : null,
+        total_descent_m: session.total_descent != null ? Number(session.total_descent) : null,
+        total_calories: session.total_calories != null ? Number(session.total_calories) : null,
+        total_distance_m: session.total_distance != null ? Number(session.total_distance) : null,
+      };
+
+      let name = null;
+      if (sport) name = `${sport}${subSport ? ` (${subSport})` : ""} Activity`;
+      if (!name) name = "FIT Activity";
+
+      resolve({ name, points, meta });
     });
   });
 }

@@ -24,7 +24,7 @@ export default function Dashboard() {
 
   const cards = [
     { label: "Segments", value: stats.segments, icon: Map, to: "/segments", testid: "stat-segments" },
-    { label: "Rides", value: stats.rides, icon: Route, to: "/rides", testid: "stat-rides" },
+    { label: "Activities", value: stats.rides, icon: Route, to: "/rides", testid: "stat-rides" },
     { label: "Detected Efforts", value: stats.efforts, icon: Trophy, to: "/leaderboards", testid: "stat-efforts" },
   ];
 
@@ -35,12 +35,10 @@ export default function Dashboard() {
           / / Overview
         </div>
         <h1 className="font-display font-black text-5xl md:text-7xl uppercase tracking-tighter leading-[0.9]">
-          Command
-          <br />
-          <span className="text-accent">Center</span>
+          Dash<span className="text-accent">board</span>
         </h1>
         <p className="text-secondary text-sm mt-4 max-w-xl">
-          Every segment. Every ride. Every effort. Tracked locally, analysed with precision.
+          Every segment. Every activity. Every effort. Tracked locally, analysed with precision.
         </p>
       </div>
 
@@ -70,14 +68,14 @@ export default function Dashboard() {
         <div className="border border-line bg-surface p-6" data-testid="recent-rides">
           <div className="flex items-center justify-between mb-4">
             <div className="font-display font-bold uppercase tracking-tight text-lg">
-              Recent Rides
+              Recent Activities
             </div>
             <Link to="/rides" className="text-[10px] uppercase tracking-[0.3em] text-accent">
               All →
             </Link>
           </div>
           {rides.length === 0 ? (
-            <div className="text-muted text-sm">No rides uploaded yet.</div>
+            <div className="text-muted text-sm">No activities uploaded yet.</div>
           ) : (
             <div className="divide-y divide-white/5">
               {rides.map((r) => (

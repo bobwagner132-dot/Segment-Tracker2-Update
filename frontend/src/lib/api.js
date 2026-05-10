@@ -173,6 +173,27 @@ export async function renameSegment(id, name) {
   return { ok: true, name: trimmed };
 }
 
+// Helper to build the FIT-extra metadata block returned by the API surface.
+function rideMetadataView(r) {
+  return {
+    sport: r.sport ?? null,
+    sub_sport: r.sub_sport ?? null,
+    device: r.device ?? null,
+    bike_name: r.bike_name ?? null,
+    moving_time_s: r.moving_time_s ?? null,
+    avg_speed_mps: r.avg_speed_mps ?? null,
+    max_speed_mps: r.max_speed_mps ?? null,
+    avg_heart_rate: r.avg_heart_rate ?? null,
+    max_heart_rate: r.max_heart_rate ?? null,
+    avg_cadence: r.avg_cadence ?? null,
+    max_cadence: r.max_cadence ?? null,
+    avg_power: r.avg_power ?? null,
+    max_power: r.max_power ?? null,
+    normalized_power: r.normalized_power ?? null,
+    total_calories: r.total_calories ?? null,
+  };
+}
+
 // ---------- Rides ----------
 export async function listRides() {
   const [rides, efforts] = await Promise.all([getAll("rides"), getAll("efforts")]);
@@ -196,6 +217,7 @@ export async function listRides() {
     point_count: r.points.length,
     created_at: r.created_at,
     effort_count: counts[r.id] || 0,
+    ...rideMetadataView(r),
   }));
 }
 
@@ -239,6 +261,7 @@ export async function getRide(id) {
     effort_count: efforts.length,
     points: decimate(pts),
     efforts,
+    ...rideMetadataView(r),
   };
 }
 
@@ -312,6 +335,22 @@ export async function uploadRide(file) {
     elevation_gain_m: Math.round(elevationGainM(points) * 10) / 10,
     points,
     created_at: new Date().toISOString(),
+    // FIT metadata (null for GPX rides)
+    sport: parsed.meta?.sport || null,
+    sub_sport: parsed.meta?.sub_sport || null,
+    device: parsed.meta?.device || null,
+    bike_name: parsed.meta?.bike_name || null,
+    moving_time_s: parsed.meta?.moving_time_s || null,
+    avg_speed_mps: parsed.meta?.avg_speed_mps || null,
+    max_speed_mps: parsed.meta?.max_speed_mps || null,
+    avg_heart_rate: parsed.meta?.avg_heart_rate || null,
+    max_heart_rate: parsed.meta?.max_heart_rate || null,
+    avg_cadence: parsed.meta?.avg_cadence || null,
+    max_cadence: parsed.meta?.max_cadence || null,
+    avg_power: parsed.meta?.avg_power || null,
+    max_power: parsed.meta?.max_power || null,
+    normalized_power: parsed.meta?.normalized_power || null,
+    total_calories: parsed.meta?.total_calories || null,
   };
   await put("rides", rideDoc);
 
@@ -467,4 +506,25 @@ export function localYear(iso) {
   } catch {
     return null;
   }
+}
+
+export function fmtSpeed(mps) {
+  if (mps == null || isNaN(mps)) return "—";
+  return `${(mps * 3.6).toFixed(1)} km/h`;
+}
+
+export function fmtTimeOfDay(iso) {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
+}
+
+export function fmtGradient(elevationM, distanceM) {
+  if (!distanceM || distanceM <= 0 || elevationM == null) return "—";
+  const pct = (elevationM / distanceM) * 100;
+  return `${pct.toFixed(1)}%`;
 }

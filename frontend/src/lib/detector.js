@@ -139,20 +139,44 @@ export function detectEfforts(ridePoints, segment) {
 
     const powers = slice.filter((p) => p.power != null).map((p) => p.power);
     const hrs = slice.filter((p) => p.hr != null).map((p) => p.hr);
+    const cads = slice.filter((p) => p.cad != null).map((p) => p.cad);
+    const speeds = slice.filter((p) => p.speed != null).map((p) => p.speed);
     const avgPower = powers.length
       ? Math.round((powers.reduce((a, b) => a + b, 0) / powers.length) * 10) / 10
       : null;
     const avgHr = hrs.length
       ? Math.round((hrs.reduce((a, b) => a + b, 0) / hrs.length) * 10) / 10
       : null;
+    const avgCad = cads.length
+      ? Math.round((cads.reduce((a, b) => a + b, 0) / cads.length) * 10) / 10
+      : null;
+    const maxPower = powers.length ? Math.max(...powers) : null;
+    const maxHr = hrs.length ? Math.max(...hrs) : null;
+    const maxCad = cads.length ? Math.max(...cads) : null;
+
+    const distance = totalDistanceM(slice);
+    const eleGain = elevationGainM(slice);
+    const avgSpeed = elapsed > 0 ? distance / elapsed : null;
+    const maxSpeed = speeds.length
+      ? Math.max(...speeds)
+      : avgSpeed; // fallback
 
     efforts.push({
       segment_id: segment.id,
       start_idx: startIdx,
       end_idx: endIdx,
       elapsed_s: elapsed,
+      moving_time_s: elapsed, // GPX/FIT records have already been filtered
+      distance_m: Math.round(distance * 10) / 10,
+      elevation_gain_m: Math.round(eleGain * 10) / 10,
+      avg_speed_mps: avgSpeed != null ? Math.round(avgSpeed * 100) / 100 : null,
+      max_speed_mps: maxSpeed != null ? Math.round(maxSpeed * 100) / 100 : null,
       avg_power: avgPower,
+      max_power: maxPower,
       avg_hr: avgHr,
+      max_hr: maxHr,
+      avg_cadence: avgCad,
+      max_cadence: maxCad,
       datetime_utc: dtStart.toISOString(),
     });
     i = endIdx + 1;

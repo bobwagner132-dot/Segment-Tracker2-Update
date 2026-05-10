@@ -5,10 +5,10 @@ import { ThemeToggle } from "@/lib/theme";
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
   { to: "/segments", label: "Segments", icon: Map, testid: "nav-segments" },
-  { to: "/rides", label: "Rides", icon: Route, testid: "nav-rides" },
+  { to: "/rides", label: "Activities", icon: Route, testid: "nav-rides" },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy, testid: "nav-leaderboards" },
   { to: "/backup", label: "Backup", icon: DatabaseBackup, testid: "nav-backup" },
-  { to: "/preferences", label: "Prefs", icon: Settings, testid: "nav-preferences" },
+  { to: "/preferences", label: "Settings", icon: Settings, testid: "nav-preferences" },
 ];
 
 export default function Layout() {
