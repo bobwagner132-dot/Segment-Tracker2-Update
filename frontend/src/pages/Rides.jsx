@@ -10,6 +10,7 @@ import {
   listRides,
   uploadRide,
   renameRide,
+  updateRideMeta,
   fmtDistance,
   fmtTime,
   fmtDateLocal,
@@ -22,11 +23,34 @@ import {
   Clock,
   Mountain,
   Bike,
-  Cpu,
+  Tag,
   ChevronDown,
   ChevronRight,
+  Pencil,
+  Check,
+  X,
+  Gauge,
+  Heart,
+  Zap,
+  Flame,
+  Thermometer,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const SUB_SPORTS = [
+  "Road",
+  "Gravel",
+  "Mountain",
+  "Cyclocross",
+  "Indoor",
+  "Commute",
+  "Touring",
+  "E-bike",
+  "Track",
+  "Other",
+];
 
 export default function Rides() {
   const [rides, setRides] = useState([]);
@@ -81,6 +105,14 @@ export default function Rides() {
     await refresh();
   }
 
+  async function handleMetaUpdate(patch) {
+    if (!selected) return;
+    const res = await updateRideMeta(selected.id, patch);
+    setSelected({ ...selected, ...res });
+    await refresh();
+    toast.success("Updated");
+  }
+
   const filtered = rides.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -103,7 +135,7 @@ export default function Rides() {
         onUpload={handleUpload}
         accept=".gpx,.fit"
         label="Drop Activity GPX or FIT"
-        sublabel="timestamps, HR, power, cadence, bike & device extracted"
+        sublabel="timestamps, HR, power, cadence, temperature & calories extracted"
         testid="ride-upload"
       />
 
@@ -141,9 +173,8 @@ export default function Rides() {
                     <div className="font-semibold text-sm truncate">{r.name}</div>
                     <div className="text-[10px] tracking-[0.2em] uppercase text-muted mt-1 truncate">
                       {fmtDateLocal(r.start_time || r.created_at)}
-                      {(r.bike_name || r.device) && (
-                        <> · {[r.bike_name, r.device].filter(Boolean).join(" / ")}</>
-                      )}
+                      {r.bike_name && <> · {r.bike_name}</>}
+                      {r.sub_sport && <> · {r.sub_sport}</>}
                       {" · "}
                       {fmtDistance(r.distance_m)} · {r.effort_count} eff
                     </div>
@@ -165,38 +196,35 @@ export default function Rides() {
           {selected ? (
             <>
               <div className="border border-line bg-surface p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] tracking-[0.3em] uppercase text-accent mb-2">
-                      Activity · {selected.source_type.toUpperCase()}
-                      {selected.sub_sport ? ` · ${selected.sub_sport}` : selected.sport ? ` · ${selected.sport}` : ""}
-                    </div>
-                    <EditableName
-                      value={selected.name}
-                      testid="ride-name"
-                      className="font-display font-black text-3xl uppercase tracking-tight leading-tight"
-                      onSave={async (next) => {
-                        await renameRide(selected.id, next);
-                        toast.success("Renamed");
-                        setSelected({ ...selected, name: next });
-                        await refresh();
-                      }}
-                    />
-                    <div className="text-xs text-muted mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span>{fmtDateLocal(selected.start_time || selected.created_at)}</span>
-                      {selected.bike_name && (
-                        <span className="flex items-center gap-1" data-testid="ride-bike">
-                          <Bike className="w-3 h-3 text-accent" /> {selected.bike_name}
-                        </span>
-                      )}
-                      {selected.device && (
-                        <span className="flex items-center gap-1" data-testid="ride-device">
-                          <Cpu className="w-3 h-3 text-accent" /> {selected.device}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                <div className="text-[10px] tracking-[0.3em] uppercase text-accent mb-2">
+                  Activity · {selected.source_type.toUpperCase()}
                 </div>
+                <EditableName
+                  value={selected.name}
+                  testid="ride-name"
+                  className="font-display font-black text-3xl uppercase tracking-tight leading-tight"
+                  onSave={async (next) => {
+                    await renameRide(selected.id, next);
+                    toast.success("Renamed");
+                    setSelected({ ...selected, name: next });
+                    await refresh();
+                  }}
+                />
+                <div className="text-xs text-muted mt-2">
+                  {fmtDateLocal(selected.start_time || selected.created_at)}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+                  <BikeField
+                    value={selected.bike_name}
+                    onSave={(v) => handleMetaUpdate({ bike_name: v })}
+                  />
+                  <SubSportField
+                    value={selected.sub_sport}
+                    onSave={(v) => handleMetaUpdate({ sub_sport: v })}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                   <Stat label="Distance" value={fmtDistance(selected.distance_m)} />
                   <Stat label="Duration" value={fmtTime(selected.duration_s)} icon={Clock} />
@@ -256,6 +284,8 @@ export default function Rides() {
                   </table>
                 </div>
               )}
+
+              <ActivitySummary ride={selected} />
             </>
           ) : (
             <div className="border border-line bg-surface p-12 text-center text-muted">
@@ -268,6 +298,156 @@ export default function Rides() {
   );
 }
 
+// ---------- Inline-editable bike name ----------
+function BikeField({ value, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => setDraft(value || ""), [value]);
+
+  async function commit() {
+    const next = draft.trim();
+    if (next === (value || "")) {
+      setEditing(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onSave(next || null);
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="border border-line p-3" data-testid="ride-bike-field">
+      <div className="text-[10px] tracking-[0.3em] uppercase text-muted mb-1 flex items-center gap-1">
+        <Bike className="w-3 h-3" /> Bike
+      </div>
+      {editing ? (
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit();
+              else if (e.key === "Escape") {
+                setDraft(value || "");
+                setEditing(false);
+              }
+            }}
+            disabled={busy}
+            placeholder="e.g. S-Works Tarmac"
+            data-testid="ride-bike-input"
+            className="flex-1 bg-transparent border-b border-accent text-sm focus:outline-none"
+          />
+          <button
+            onClick={commit}
+            disabled={busy}
+            data-testid="ride-bike-save"
+            className="p-1 text-accent hover:bg-subtle"
+          >
+            <Check className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => {
+              setDraft(value || "");
+              setEditing(false);
+            }}
+            disabled={busy}
+            className="p-1 text-muted hover:text-danger"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          data-testid="ride-bike-edit"
+          className="flex items-center justify-between w-full text-left hover:text-accent"
+        >
+          <span className={value ? "text-main text-sm font-semibold" : "text-faint text-sm italic"}>
+            {value || "Add bike name…"}
+          </span>
+          <Pencil className="w-3.5 h-3.5 text-muted" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SubSportField({ value, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+
+  useEffect(() => setDraft(value || ""), [value]);
+
+  async function commit(next) {
+    const v = (next ?? draft).trim();
+    if (v === (value || "")) {
+      setEditing(false);
+      return;
+    }
+    await onSave(v || null);
+    setEditing(false);
+  }
+
+  return (
+    <div className="border border-line p-3" data-testid="ride-subsport-field">
+      <div className="text-[10px] tracking-[0.3em] uppercase text-muted mb-1 flex items-center gap-1">
+        <Tag className="w-3 h-3" /> Sub-sport
+      </div>
+      {editing ? (
+        <div className="flex items-center gap-2">
+          <select
+            autoFocus
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              commit(e.target.value);
+            }}
+            data-testid="ride-subsport-select"
+            className="flex-1 bg-transparent border-b border-accent text-sm focus:outline-none"
+          >
+            <option value="">— None —</option>
+            {SUB_SPORTS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              setDraft(value || "");
+              setEditing(false);
+            }}
+            className="p-1 text-muted hover:text-danger"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          data-testid="ride-subsport-edit"
+          className="flex items-center justify-between w-full text-left hover:text-accent"
+        >
+          <span className={value ? "text-main text-sm font-semibold" : "text-faint text-sm italic"}>
+            {value || "Set sub-sport…"}
+          </span>
+          <Pencil className="w-3.5 h-3.5 text-muted" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------- Per-effort expandable row ----------
 function EffortRow({ effort: e, index, active, expanded, onSelect, onToggleExpand }) {
   return (
     <>
@@ -369,11 +549,131 @@ function EffortRow({ effort: e, index, active, expanded, onSelect, onToggleExpan
   );
 }
 
+// ---------- Activity-level full summary ----------
+function ActivitySummary({ ride }) {
+  const tempUnit = "°C";
+  return (
+    <div className="border border-line bg-surface p-6" data-testid="activity-summary">
+      <div className="text-[10px] tracking-[0.3em] uppercase text-accent mb-5">
+        Activity Summary
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+        <SummaryGroup label="Speed" icon={Gauge}>
+          <Detail label="Average" value={fmtSpeed(ride.avg_speed_mps)} />
+          <Detail label="Max" value={fmtSpeed(ride.max_speed_mps)} />
+        </SummaryGroup>
+
+        <SummaryGroup label="Elevation" icon={Mountain}>
+          <Detail
+            label={
+              <span className="flex items-center gap-1">
+                <TrendingUp className="w-3 h-3 text-accent" /> Total ascent
+              </span>
+            }
+            value={
+              ride.total_ascent_m != null
+                ? `+${Math.round(ride.total_ascent_m)} m`
+                : "—"
+            }
+          />
+          <Detail
+            label={
+              <span className="flex items-center gap-1">
+                <TrendingDown className="w-3 h-3 text-accent" /> Total descent
+              </span>
+            }
+            value={
+              ride.total_descent_m != null
+                ? `−${Math.round(ride.total_descent_m)} m`
+                : "—"
+            }
+          />
+        </SummaryGroup>
+
+        <SummaryGroup label="Power" icon={Zap}>
+          <Detail
+            label="Average"
+            value={ride.avg_power != null ? `${Math.round(ride.avg_power)} W` : "—"}
+          />
+          <Detail
+            label="Max"
+            value={ride.max_power != null ? `${Math.round(ride.max_power)} W` : "—"}
+          />
+          <Detail
+            label="Normalized"
+            value={
+              ride.normalized_power != null
+                ? `${Math.round(ride.normalized_power)} W`
+                : "—"
+            }
+          />
+        </SummaryGroup>
+
+        <SummaryGroup label="Heart rate" icon={Heart}>
+          <Detail
+            label="Average"
+            value={ride.avg_heart_rate != null ? `${Math.round(ride.avg_heart_rate)} bpm` : "—"}
+          />
+          <Detail
+            label="Max"
+            value={ride.max_heart_rate != null ? `${Math.round(ride.max_heart_rate)} bpm` : "—"}
+          />
+        </SummaryGroup>
+
+        <SummaryGroup label="Cadence" icon={Bike}>
+          <Detail
+            label="Average"
+            value={ride.avg_cadence != null ? `${Math.round(ride.avg_cadence)} rpm` : "—"}
+          />
+          <Detail
+            label="Max"
+            value={ride.max_cadence != null ? `${Math.round(ride.max_cadence)} rpm` : "—"}
+          />
+        </SummaryGroup>
+
+        <SummaryGroup label="Other" icon={Flame}>
+          <Detail
+            label="Calories"
+            value={ride.total_calories != null ? `${Math.round(ride.total_calories)} kcal` : "—"}
+          />
+          <Detail
+            label={
+              <span className="flex items-center gap-1">
+                <Thermometer className="w-3 h-3 text-accent" /> Temperature
+              </span>
+            }
+            value={
+              ride.avg_temperature != null
+                ? `${Math.round(ride.avg_temperature)}${tempUnit}` +
+                  (ride.max_temperature != null
+                    ? ` (max ${Math.round(ride.max_temperature)}${tempUnit})`
+                    : "")
+                : "—"
+            }
+          />
+        </SummaryGroup>
+      </div>
+    </div>
+  );
+}
+
+function SummaryGroup({ label, icon: Icon, children }) {
+  return (
+    <div data-testid={`summary-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+      <div className="text-[11px] tracking-[0.3em] uppercase font-semibold text-main mb-3 flex items-center gap-2 border-b border-line-subtle pb-2">
+        {Icon && <Icon className="w-3.5 h-3.5 text-accent" strokeWidth={1.8} />}
+        {label}
+      </div>
+      <div className="space-y-2.5">{children}</div>
+    </div>
+  );
+}
+
 function Detail({ label, value }) {
   return (
-    <div>
+    <div className="flex items-baseline justify-between gap-3">
       <div className="text-[10px] tracking-[0.25em] uppercase text-muted">{label}</div>
-      <div className="font-num text-base mt-0.5">{value}</div>
+      <div className="font-num text-base">{value}</div>
     </div>
   );
 }

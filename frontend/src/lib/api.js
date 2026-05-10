@@ -10,6 +10,7 @@ import {
   decimate,
   detectEfforts,
   elevationGainM,
+  elevationLossM,
   hashRide,
   hashSegment,
   totalDistanceM,
@@ -191,6 +192,11 @@ function rideMetadataView(r) {
     max_power: r.max_power ?? null,
     normalized_power: r.normalized_power ?? null,
     total_calories: r.total_calories ?? null,
+    total_ascent_m: r.total_ascent_m ?? r.elevation_gain_m ?? null,
+    total_descent_m: r.total_descent_m ?? r.elevation_loss_m ?? null,
+    avg_temperature: r.avg_temperature ?? null,
+    max_temperature: r.max_temperature ?? null,
+    min_temperature: r.min_temperature ?? null,
   };
 }
 
@@ -333,6 +339,7 @@ export async function uploadRide(file) {
     duration_s: durationS,
     distance_m: Math.round(totalDistanceM(points) * 10) / 10,
     elevation_gain_m: Math.round(elevationGainM(points) * 10) / 10,
+    elevation_loss_m: Math.round(elevationLossM(points) * 10) / 10,
     points,
     created_at: new Date().toISOString(),
     // FIT metadata (null for GPX rides)
@@ -351,6 +358,11 @@ export async function uploadRide(file) {
     max_power: parsed.meta?.max_power || null,
     normalized_power: parsed.meta?.normalized_power || null,
     total_calories: parsed.meta?.total_calories || null,
+    total_ascent_m: parsed.meta?.total_ascent_m || null,
+    total_descent_m: parsed.meta?.total_descent_m || null,
+    avg_temperature: parsed.meta?.avg_temperature || null,
+    max_temperature: parsed.meta?.max_temperature || null,
+    min_temperature: parsed.meta?.min_temperature || null,
   };
   await put("rides", rideDoc);
 
@@ -414,6 +426,22 @@ export async function renameRide(id, name) {
   await put("rides", r);
   await updateEffortsRideName(id, trimmed);
   return { ok: true, name: trimmed };
+}
+
+// Patch user-editable activity metadata (bike_name, sub_sport).
+// Pass empty string or null to clear a field.
+const EDITABLE_META_KEYS = ["bike_name", "sub_sport"];
+export async function updateRideMeta(id, patch) {
+  const r = await getOne("rides", id);
+  if (!r) throw new ApiError("Ride not found", 404);
+  for (const k of EDITABLE_META_KEYS) {
+    if (k in patch) {
+      const v = patch[k];
+      r[k] = v == null || (typeof v === "string" && !v.trim()) ? null : String(v).trim();
+    }
+  }
+  await put("rides", r);
+  return { ok: true, ...rideMetadataView(r) };
 }
 
 // ---------- Efforts ----------

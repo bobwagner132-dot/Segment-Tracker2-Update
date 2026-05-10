@@ -197,6 +197,7 @@ export function parseFit(arrayBuffer) {
         if (r.cadence != null) pt.cad = Math.round(Number(r.cadence));
         if (r.speed != null) pt.speed = Number(r.speed);
         else if (r.enhanced_speed != null) pt.speed = Number(r.enhanced_speed);
+        if (r.temperature != null) pt.temp = Number(r.temperature);
         points.push(pt);
       }
 
@@ -229,6 +230,9 @@ export function parseFit(arrayBuffer) {
         total_descent_m: session.total_descent != null ? Number(session.total_descent) : null,
         total_calories: session.total_calories != null ? Number(session.total_calories) : null,
         total_distance_m: session.total_distance != null ? Number(session.total_distance) : null,
+        avg_temperature: session.avg_temperature != null ? Number(session.avg_temperature) : null,
+        max_temperature: session.max_temperature != null ? Number(session.max_temperature) : null,
+        min_temperature: session.min_temperature != null ? Number(session.min_temperature) : null,
       };
 
       let name = null;

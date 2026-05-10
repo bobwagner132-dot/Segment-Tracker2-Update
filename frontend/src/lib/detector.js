@@ -34,6 +34,16 @@ export function elevationGainM(points) {
   return gain;
 }
 
+export function elevationLossM(points) {
+  let loss = 0.0;
+  for (let i = 1; i < points.length; i++) {
+    const e1 = points[i - 1].ele;
+    const e2 = points[i].ele;
+    if (e1 != null && e2 != null && e2 < e1) loss += e1 - e2;
+  }
+  return loss;
+}
+
 export function decimate(points, maxPoints = MAX_DISPLAY_POINTS) {
   if (points.length <= maxPoints) return points;
   const step = Math.max(1, Math.floor(points.length / maxPoints));
