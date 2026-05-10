@@ -27,11 +27,20 @@ export default function Segments() {
     setSegments(s);
     const qid = params.get("id");
     if (qid) {
-      const detail = await getSegment(qid);
-      setSelected(detail);
-    } else if (!selected && s.length > 0) {
+      try {
+        const detail = await getSegment(qid);
+        setSelected(detail);
+        return;
+      } catch {
+        // stale id (e.g. just deleted) — fall through and pick the first segment
+        setParams({}, { replace: true });
+      }
+    }
+    if (s.length > 0) {
       const d = await getSegment(s[0].id);
       setSelected(d);
+    } else {
+      setSelected(null);
     }
   }
 
@@ -58,8 +67,8 @@ export default function Segments() {
     if (!window.confirm("Delete this segment and all its efforts?")) return;
     await deleteSegment(id);
     toast.success("Segment deleted");
-    if (selected?.id === id) setSelected(null);
-    setParams({});
+    setSelected(null);
+    setParams({}, { replace: true });
     await refresh();
   }
 

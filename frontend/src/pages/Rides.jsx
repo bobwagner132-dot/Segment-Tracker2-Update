@@ -65,13 +65,23 @@ export default function Rides() {
     setRides(r);
     const qid = params.get("id");
     if (qid) {
-      const detail = await getRide(qid);
-      setSelected(detail);
-      setActiveEffortIdx(detail.efforts?.length > 0 ? 0 : null);
-    } else if (!selected && r.length > 0) {
+      try {
+        const detail = await getRide(qid);
+        setSelected(detail);
+        setActiveEffortIdx(detail.efforts?.length > 0 ? 0 : null);
+        return;
+      } catch {
+        // stale id (e.g. just deleted) — fall through and pick the first ride
+        setParams({}, { replace: true });
+      }
+    }
+    if (r.length > 0) {
       const d = await getRide(r[0].id);
       setSelected(d);
       setActiveEffortIdx(d.efforts?.length > 0 ? 0 : null);
+    } else {
+      setSelected(null);
+      setActiveEffortIdx(null);
     }
   }
 
@@ -100,8 +110,10 @@ export default function Rides() {
     if (!window.confirm("Delete this activity?")) return;
     await deleteRide(id);
     toast.success("Activity deleted");
-    if (selected?.id === id) setSelected(null);
-    setParams({});
+    setSelected(null);
+    setActiveEffortIdx(null);
+    setExpandedIdx(null);
+    setParams({}, { replace: true });
     await refresh();
   }
 
