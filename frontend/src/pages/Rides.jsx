@@ -11,6 +11,7 @@ import {
   uploadRide,
   renameRide,
   updateRideMeta,
+  listBikes,
   fmtDistance,
   fmtTime,
   fmtDateLocal,
@@ -59,6 +60,11 @@ export default function Rides() {
   const [params, setParams] = useSearchParams();
   const [activeEffortIdx, setActiveEffortIdx] = useState(null);
   const [expandedIdx, setExpandedIdx] = useState(null);
+  const [bikes, setBikes] = useState([]);
+
+  async function refreshBikes() {
+    setBikes(await listBikes());
+  }
 
   async function refresh() {
     const r = await listRides();
@@ -87,6 +93,7 @@ export default function Rides() {
 
   useEffect(() => {
     refresh();
+    refreshBikes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -122,6 +129,7 @@ export default function Rides() {
     const res = await updateRideMeta(selected.id, patch);
     setSelected({ ...selected, ...res });
     await refresh();
+    if ("bike_name" in patch) await refreshBikes();
     toast.success("Updated");
   }
 
@@ -229,6 +237,7 @@ export default function Rides() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
                   <BikeField
                     value={selected.bike_name}
+                    bikes={bikes}
                     onSave={(v) => handleMetaUpdate({ bike_name: v })}
                   />
                   <SubSportField
@@ -310,8 +319,8 @@ export default function Rides() {
   );
 }
 
-// ---------- Inline-editable bike name ----------
-function BikeField({ value, onSave }) {
+// ---------- Inline-editable bike name with autocomplete ----------
+function BikeField({ value, bikes = [], onSave }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || "");
   const [busy, setBusy] = useState(false);
@@ -335,8 +344,15 @@ function BikeField({ value, onSave }) {
 
   return (
     <div className="border border-line p-3" data-testid="ride-bike-field">
-      <div className="text-[10px] tracking-[0.3em] uppercase text-muted mb-1 flex items-center gap-1">
-        <Bike className="w-3 h-3" /> Bike
+      <div className="text-[10px] tracking-[0.3em] uppercase text-muted mb-1 flex items-center justify-between gap-1">
+        <span className="flex items-center gap-1">
+          <Bike className="w-3 h-3" /> Bike
+        </span>
+        {bikes.length > 0 && !editing && (
+          <span className="text-[9px] tracking-[0.2em] text-faint normal-case">
+            {bikes.length} saved
+          </span>
+        )}
       </div>
       {editing ? (
         <div className="flex items-center gap-2">
@@ -353,9 +369,15 @@ function BikeField({ value, onSave }) {
             }}
             disabled={busy}
             placeholder="e.g. S-Works Tarmac"
+            list="cst-bike-suggestions"
             data-testid="ride-bike-input"
             className="flex-1 bg-transparent border-b border-accent text-sm focus:outline-none"
           />
+          <datalist id="cst-bike-suggestions">
+            {bikes.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
           <button
             onClick={commit}
             disabled={busy}

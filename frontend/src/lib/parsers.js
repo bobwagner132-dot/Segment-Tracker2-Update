@@ -236,8 +236,10 @@ export function parseFit(arrayBuffer) {
       };
 
       let name = null;
-      if (sport) name = `${sport}${subSport ? ` (${subSport})` : ""} Activity`;
-      if (!name) name = "FIT Activity";
+      // We deliberately do NOT synthesize a name from sport/sub_sport here.
+      // Returning null lets the upload pipeline pick the reverse-geocoded
+      // "<Suburb> Ride" name when available, otherwise fall back to filename.
+      // sport / sub_sport are still surfaced separately via `meta`.
 
       resolve({ name, points, meta });
     });

@@ -23,9 +23,11 @@ import {
   findByIndex,
   findOneByIndex,
   getAll,
+  getMeta,
   getOne,
   put,
   remove,
+  setMeta,
   updateEffortsRideName,
 } from "./localdb";
 import { reverseGeocode } from "./geocode";
@@ -172,6 +174,60 @@ export async function renameSegment(id, name) {
   s.name = trimmed;
   await put("segments", s);
   return { ok: true, name: trimmed };
+}
+
+// ---------- Bike registry (user-managed) ----------
+// Persisted in the IndexedDB `meta` store:
+//   bike_names    : array of unique bike names (insertion-ordered, most-recent first)
+//   default_bike  : string — bike to assign to new activities that don't carry one
+const BIKE_LIST_KEY = "bike_names";
+const DEFAULT_BIKE_KEY = "default_bike";
+
+export async function listBikes() {
+  const list = (await getMeta(BIKE_LIST_KEY)) || [];
+  return Array.isArray(list) ? list.filter(Boolean) : [];
+}
+
+export async function getDefaultBike() {
+  const v = await getMeta(DEFAULT_BIKE_KEY);
+  return v || null;
+}
+
+export async function setDefaultBike(name) {
+  if (!name) {
+    await setMeta(DEFAULT_BIKE_KEY, null);
+    return null;
+  }
+  const trimmed = String(name).trim();
+  await setMeta(DEFAULT_BIKE_KEY, trimmed);
+  return trimmed;
+}
+
+// Add (or move-to-front) a bike in the registry, and adopt it as the default.
+export async function addBike(name) {
+  const trimmed = (name || "").toString().trim();
+  if (!trimmed) return null;
+  const existing = await listBikes();
+  const filtered = existing.filter(
+    (b) => b.toLowerCase() !== trimmed.toLowerCase()
+  );
+  filtered.unshift(trimmed);
+  // De-dup case-insensitive while preserving the user's original casing
+  await setMeta(BIKE_LIST_KEY, filtered);
+  await setMeta(DEFAULT_BIKE_KEY, trimmed);
+  return trimmed;
+}
+
+export async function removeBike(name) {
+  const trimmed = (name || "").toString().trim();
+  const list = await listBikes();
+  const next = list.filter((b) => b.toLowerCase() !== trimmed.toLowerCase());
+  await setMeta(BIKE_LIST_KEY, next);
+  const def = await getDefaultBike();
+  if (def && def.toLowerCase() === trimmed.toLowerCase()) {
+    await setMeta(DEFAULT_BIKE_KEY, next[0] || null);
+  }
+  return next;
 }
 
 // Helper to build the FIT-extra metadata block returned by the API surface.
@@ -330,6 +386,16 @@ export async function uploadRide(file) {
       parsedName.toLowerCase().endsWith("ride"));
   const finalName = useAuto ? autoName : parsedName || baseFilename;
 
+  // Resolve bike: file metadata wins, otherwise the user's default bike.
+  let bikeName = parsed.meta?.bike_name || null;
+  if (!bikeName) {
+    const defaultBike = await getDefaultBike();
+    if (defaultBike) bikeName = defaultBike;
+  } else {
+    // FIT supplied a bike name — make sure it's in the registry too
+    await addBike(bikeName);
+  }
+
   const rideDoc = {
     id: rideId,
     name: finalName,
@@ -346,7 +412,7 @@ export async function uploadRide(file) {
     sport: parsed.meta?.sport || null,
     sub_sport: parsed.meta?.sub_sport || null,
     device: parsed.meta?.device || null,
-    bike_name: parsed.meta?.bike_name || null,
+    bike_name: bikeName,
     moving_time_s: parsed.meta?.moving_time_s || null,
     avg_speed_mps: parsed.meta?.avg_speed_mps || null,
     max_speed_mps: parsed.meta?.max_speed_mps || null,
@@ -406,6 +472,7 @@ export async function uploadRide(file) {
     effort_count: allEfforts.length,
     points: decimate(points),
     efforts: allEfforts,
+    ...rideMetadataView(rideDoc),
   };
 }
 
@@ -441,6 +508,10 @@ export async function updateRideMeta(id, patch) {
     }
   }
   await put("rides", r);
+  // Side-effect: if a bike name was set, register it as the new default
+  if ("bike_name" in patch && r.bike_name) {
+    await addBike(r.bike_name);
+  }
   return { ok: true, ...rideMetadataView(r) };
 }
 
