@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { deleteAllRides, getStats, listRides, listSegments } from "../lib/api";
+import { deleteAllRides, deleteAllSegments, getStats, listRides, listSegments } from "../lib/api";
 import { ArrowRight, Trash2, Activity } from "lucide-react";
 import { fmtDistance, fmtTime, fmtDateLocal } from "../lib/api";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [rides, setRides] = useState([]);
   const [segments, setSegments] = useState([]);
   const [confirmingPurge, setConfirmingPurge] = useState(false);
+  const [confirmingPurgeSegs, setConfirmingPurgeSegs] = useState(false);
 
   async function refresh() {
     try {
@@ -35,6 +36,13 @@ export default function Dashboard() {
     await refresh();
   }
 
+  async function handlePurgeSegments() {
+    setConfirmingPurgeSegs(false);
+    await deleteAllSegments();
+    toast.success("All segments & leaderboards cleared");
+    await refresh();
+  }
+
   return (
     <div className="space-y-10 animate-fade-up" data-testid="dashboard-page">
       <div>
@@ -46,7 +54,7 @@ export default function Dashboard() {
         </p>
 
         {/* TEMP dev tool — remove once the app is finished */}
-        <div className="mt-5 inline-flex items-center gap-3 border border-dashed border-line-strong px-4 py-2">
+        <div className="mt-5 inline-flex flex-wrap items-center gap-3 border border-dashed border-line-strong px-4 py-2">
           <span className="text-[10px] tracking-[0.3em] uppercase text-muted">
             Dev tool
           </span>
@@ -59,6 +67,17 @@ export default function Dashboard() {
           >
             <Trash2 className="w-3.5 h-3.5" />
             Delete all activities ({stats.rides})
+          </button>
+          <span className="text-faint text-[10px]">·</span>
+          <button
+            type="button"
+            onClick={() => setConfirmingPurgeSegs(true)}
+            disabled={stats.segments === 0 && stats.efforts === 0}
+            data-testid="dev-delete-all-segments"
+            className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] font-bold text-danger hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete segments &amp; leaderboards ({stats.segments}/{stats.efforts})
           </button>
         </div>
       </div>
@@ -153,6 +172,18 @@ export default function Dashboard() {
         testid="purge-activities-confirm"
         onConfirm={handlePurge}
         onCancel={() => setConfirmingPurge(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmingPurgeSegs}
+        title={`Delete all ${stats.segments} segments & ${stats.efforts} leaderboard entries?`}
+        description="Every segment definition AND every detected effort/leaderboard row will be permanently removed. Activities and the bike registry are kept. This cannot be undone."
+        confirmLabel="Delete segments & leaderboards"
+        cancelLabel="Keep"
+        destructive
+        testid="purge-segments-confirm"
+        onConfirm={handlePurgeSegments}
+        onCancel={() => setConfirmingPurgeSegs(false)}
       />
     </div>
   );

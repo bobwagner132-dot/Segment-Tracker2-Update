@@ -906,6 +906,13 @@ export async function deleteAllRides() {
   return { ok: true };
 }
 
+// TEMP (dev/testing only) — clears every segment and every effort/leaderboard
+// entry but leaves rides and the bike registry intact.
+export async function deleteAllSegments() {
+  await clearStores(["segments", "efforts"]);
+  return { ok: true };
+}
+
 // Patch user-editable activity metadata (bike_name, sub_sport).
 // Pass empty string or null to clear a field.
 const EDITABLE_META_KEYS = ["bike_name", "sub_sport"];
