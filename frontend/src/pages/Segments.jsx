@@ -4,6 +4,7 @@ import UploadZone from "../components/UploadZone";
 import MapView from "../components/MapView";
 import ElevationChart from "../components/ElevationChart";
 import EditableName from "../components/EditableName";
+import ConfirmDialog from "../components/ConfirmDialog";
 import {
   deleteSegment,
   getSegment,
@@ -21,6 +22,7 @@ export default function Segments() {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
   const [params, setParams] = useSearchParams();
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   async function refresh() {
     const s = await listSegments();
@@ -62,9 +64,15 @@ export default function Segments() {
     setParams({ id });
   }
 
-  async function handleDelete(id, e) {
+  function requestDelete(seg, e) {
     e?.stopPropagation();
-    if (!window.confirm("Delete this segment and all its efforts?")) return;
+    setPendingDelete({ id: seg.id, name: seg.name });
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setPendingDelete(null);
     await deleteSegment(id);
     toast.success("Segment deleted");
     setSelected(null);
@@ -129,7 +137,7 @@ export default function Segments() {
                     </div>
                   </div>
                   <button
-                    onClick={(e) => handleDelete(s.id, e)}
+                    onClick={(e) => requestDelete(s, e)}
                     data-testid={`segment-delete-${s.id}`}
                     className="p-1 text-faint hover:text-danger"
                   >
@@ -187,6 +195,22 @@ export default function Segments() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this segment?"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.name}" and every detected effort against it will be permanently removed. This cannot be undone.`
+            : null
+        }
+        confirmLabel="Delete segment"
+        cancelLabel="Keep"
+        destructive
+        testid="delete-segment-confirm"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
 import {
   bulkInsert,
   clearAll,
+  clearStores,
   count,
   deleteEffortsBy,
   findByIndex,
@@ -493,6 +494,13 @@ export async function renameRide(id, name) {
   await put("rides", r);
   await updateEffortsRideName(id, trimmed);
   return { ok: true, name: trimmed };
+}
+
+// TEMP (dev/testing only) — clears every ride + every effort but leaves
+// segments and the bike registry intact. Wired to a button on the Dashboard.
+export async function deleteAllRides() {
+  await clearStores(["rides", "efforts"]);
+  return { ok: true };
 }
 
 // Patch user-editable activity metadata (bike_name, sub_sport).

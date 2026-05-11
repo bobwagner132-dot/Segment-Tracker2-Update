@@ -85,6 +85,13 @@ export async function clearAll() {
   await tx.done;
 }
 
+export async function clearStores(stores) {
+  const db = await getDB();
+  const tx = db.transaction(stores, "readwrite");
+  await Promise.all(stores.map((s) => tx.objectStore(s).clear()));
+  await tx.done;
+}
+
 export async function bulkInsert(store, items) {
   if (!items || items.length === 0) return;
   const db = await getDB();

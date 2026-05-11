@@ -1,26 +1,38 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getStats, listRides, listSegments } from "../lib/api";
-import { Map, Route, Trophy, Activity, ArrowRight } from "lucide-react";
+import { deleteAllRides, getStats, listRides, listSegments } from "../lib/api";
+import { Map, Route, Trophy, Activity, ArrowRight, Trash2 } from "lucide-react";
 import { fmtDistance, fmtTime, fmtDateLocal } from "../lib/api";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ segments: 0, rides: 0, efforts: 0 });
   const [rides, setRides] = useState([]);
   const [segments, setSegments] = useState([]);
+  const [confirmingPurge, setConfirmingPurge] = useState(false);
+
+  async function refresh() {
+    try {
+      const [s, r, sg] = await Promise.all([getStats(), listRides(), listSegments()]);
+      setStats(s);
+      setRides(r.slice(0, 5));
+      setSegments(sg.slice(0, 5));
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [s, r, sg] = await Promise.all([getStats(), listRides(), listSegments()]);
-        setStats(s);
-        setRides(r.slice(0, 5));
-        setSegments(sg.slice(0, 5));
-      } catch (e) {
-        console.error(e);
-      }
-    })();
+    refresh();
   }, []);
+
+  async function handlePurge() {
+    setConfirmingPurge(false);
+    await deleteAllRides();
+    toast.success("All activities cleared");
+    await refresh();
+  }
 
   const cards = [
     { label: "Segments", value: stats.segments, icon: Map, to: "/segments", testid: "stat-segments" },
@@ -40,6 +52,23 @@ export default function Dashboard() {
         <p className="text-secondary text-sm mt-4 max-w-xl">
           Every segment. Every activity. Every effort. Tracked locally, analysed with precision.
         </p>
+
+        {/* TEMP dev tool — remove once the app is finished */}
+        <div className="mt-5 inline-flex items-center gap-3 border border-dashed border-line-strong px-4 py-2">
+          <span className="text-[10px] tracking-[0.3em] uppercase text-muted">
+            Dev tool
+          </span>
+          <button
+            type="button"
+            onClick={() => setConfirmingPurge(true)}
+            disabled={stats.rides === 0}
+            data-testid="dev-delete-all-rides"
+            className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] font-bold text-danger hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete all activities ({stats.rides})
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="stats-grid">
@@ -141,6 +170,18 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmingPurge}
+        title={`Delete all ${stats.rides} activities?`}
+        description="Every uploaded activity AND every detected effort will be permanently removed. Segments and bike registry are kept. This cannot be undone."
+        confirmLabel="Delete everything"
+        cancelLabel="Keep"
+        destructive
+        testid="purge-activities-confirm"
+        onConfirm={handlePurge}
+        onCancel={() => setConfirmingPurge(false)}
+      />
     </div>
   );
 }

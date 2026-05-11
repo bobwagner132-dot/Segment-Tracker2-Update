@@ -4,6 +4,7 @@ import UploadZone from "../components/UploadZone";
 import MapView from "../components/MapView";
 import ElevationChart from "../components/ElevationChart";
 import EditableName from "../components/EditableName";
+import ConfirmDialog from "../components/ConfirmDialog";
 import {
   deleteRide,
   getRide,
@@ -61,6 +62,7 @@ export default function Rides() {
   const [activeEffortIdx, setActiveEffortIdx] = useState(null);
   const [expandedIdx, setExpandedIdx] = useState(null);
   const [bikes, setBikes] = useState([]);
+  const [pendingDelete, setPendingDelete] = useState(null); // { id, name }
 
   async function refreshBikes() {
     setBikes(await listBikes());
@@ -112,9 +114,15 @@ export default function Rides() {
     setParams({ id });
   }
 
-  async function handleDelete(id, e) {
+  function requestDelete(ride, e) {
     e?.stopPropagation();
-    if (!window.confirm("Delete this activity?")) return;
+    setPendingDelete({ id: ride.id, name: ride.name });
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setPendingDelete(null);
     await deleteRide(id);
     toast.success("Activity deleted");
     setSelected(null);
@@ -200,7 +208,7 @@ export default function Rides() {
                     </div>
                   </div>
                   <button
-                    onClick={(e) => handleDelete(r.id, e)}
+                    onClick={(e) => requestDelete(r, e)}
                     data-testid={`ride-delete-${r.id}`}
                     className="p-1 text-faint hover:text-danger"
                   >
@@ -315,6 +323,22 @@ export default function Rides() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this activity?"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.name}" and all its detected efforts will be permanently removed from your local database. This cannot be undone.`
+            : null
+        }
+        confirmLabel="Delete activity"
+        cancelLabel="Keep"
+        destructive
+        testid="delete-activity-confirm"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }
