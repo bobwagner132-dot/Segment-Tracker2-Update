@@ -13,6 +13,7 @@ import {
   Clock,
   Mountain,
   Route as RouteIcon,
+  Wrench,
 } from "lucide-react";
 import {
   addBike,
@@ -278,6 +279,14 @@ function BikeRow({ bike, busy, onSetDefault, onRename, onDelete }) {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <Link
+            to={`/equipment/${encodeURIComponent(bike.name)}`}
+            data-testid={`bike-open-${bike.name}`}
+            className="inline-flex items-center gap-1 border border-line-strong hover:border-accent px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-main hover:text-accent"
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            Maintenance
+          </Link>
           {!bike.is_default && (
             <button
               type="button"
@@ -307,22 +316,35 @@ function BikeRow({ bike, busy, onSetDefault, onRename, onDelete }) {
 }
 
 function BikeStatsInline({ bike }) {
+  const showTotal = bike && (bike.starting_km > 0 || bike.total_km != null);
   return (
     <div className="flex items-center gap-x-5 gap-y-1 flex-wrap mt-2 text-xs text-secondary">
       <Pair icon={RouteIcon} label="Rides" value={bike.ride_count} />
       <Pair label="Distance" value={fmtDistance(bike.distance_m)} />
+      {showTotal && (
+        <Pair
+          label="Total"
+          value={`${(bike.total_km || 0).toFixed(1)} km`}
+          accent
+        />
+      )}
       <Pair icon={Clock} label="Time" value={fmtTime(bike.moving_time_s)} />
       <Pair icon={Mountain} label="Climbed" value={`+${bike.elevation_gain_m} m`} />
+      {bike.added_at && <Pair label="Added" value={bike.added_at} />}
     </div>
   );
 }
 
-function Pair({ icon: Icon, label, value }) {
+function Pair({ icon: Icon, label, value, accent }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       {Icon && <Icon className="w-3 h-3 text-faint" strokeWidth={1.6} />}
       <span className="text-[10px] uppercase tracking-[0.2em] text-muted">{label}</span>
-      <span className="font-num font-semibold text-main">{value}</span>
+      <span
+        className={`font-num font-semibold ${accent ? "text-accent" : "text-main"}`}
+      >
+        {value}
+      </span>
     </span>
   );
 }

@@ -231,6 +231,134 @@ export async function removeBike(name) {
   return next;
 }
 
+// ---------- Per-bike profiles (added date, starting km, maintenance log) ----------
+const BIKE_PROFILES_KEY = "bike_profiles";
+
+async function getProfiles() {
+  return (await getMeta(BIKE_PROFILES_KEY)) || {};
+}
+async function saveProfiles(map) {
+  await setMeta(BIKE_PROFILES_KEY, map);
+}
+
+function blankProfile() {
+  return {
+    added_at: new Date().toISOString().slice(0, 10),
+    starting_km: 0,
+    parts: {}, // partKey -> { events: [...] }
+    custom_parts: {}, // category -> [partName,...]
+  };
+}
+
+export async function getBikeProfile(name) {
+  if (!name) return null;
+  const all = await getProfiles();
+  return all[name] || null;
+}
+
+// Sum of distance_m for all rides tagged with this bike (in metres).
+async function distanceForBike(name) {
+  const rides = await getAll("rides");
+  let m = 0;
+  for (const r of rides) {
+    if (r.bike_name && r.bike_name.toLowerCase() === name.toLowerCase()) {
+      m += r.distance_m || 0;
+    }
+  }
+  return m;
+}
+
+// Returns the bike profile augmented with computed totals.
+//   ridden_km     — total km from activities tagged with this bike
+//   total_km      — starting_km + ridden_km
+export async function getBikeProfileWithStats(name) {
+  if (!name) return null;
+  const all = await getProfiles();
+  const prof = all[name] || blankProfile();
+  const riddenM = await distanceForBike(name);
+  const ridden_km = Math.round((riddenM / 1000) * 10) / 10;
+  return {
+    name,
+    added_at: prof.added_at || null,
+    starting_km: prof.starting_km || 0,
+    parts: prof.parts || {},
+    custom_parts: prof.custom_parts || {},
+    ridden_km,
+    total_km: Math.round((prof.starting_km + ridden_km) * 10) / 10,
+  };
+}
+
+export async function updateBikeProfile(name, patch) {
+  if (!name) throw new ApiError("Bike name required");
+  const all = await getProfiles();
+  const prof = all[name] || blankProfile();
+  if ("added_at" in patch) prof.added_at = patch.added_at || null;
+  if ("starting_km" in patch) {
+    const n = parseFloat(patch.starting_km);
+    prof.starting_km = Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+  all[name] = prof;
+  await saveProfiles(all);
+  return prof;
+}
+
+export async function addPartEvent(bikeName, partKey, event) {
+  if (!bikeName || !partKey) throw new ApiError("bikeName and partKey required");
+  const all = await getProfiles();
+  const prof = all[bikeName] || blankProfile();
+  if (!prof.parts[partKey]) prof.parts[partKey] = { events: [] };
+  prof.parts[partKey].events.unshift({
+    id: (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}`,
+    date: event.date || new Date().toISOString().slice(0, 10),
+    at_km: event.at_km != null ? parseFloat(event.at_km) : null,
+    action: event.action || "Note",
+    notes: event.notes || "",
+  });
+  all[bikeName] = prof;
+  await saveProfiles(all);
+  return prof.parts[partKey];
+}
+
+export async function deletePartEvent(bikeName, partKey, eventId) {
+  const all = await getProfiles();
+  const prof = all[bikeName];
+  if (!prof?.parts?.[partKey]) return null;
+  prof.parts[partKey].events = (prof.parts[partKey].events || []).filter(
+    (e) => e.id !== eventId
+  );
+  all[bikeName] = prof;
+  await saveProfiles(all);
+  return prof.parts[partKey];
+}
+
+export async function addCustomPart(bikeName, category, partName) {
+  if (!bikeName || !category || !partName) return null;
+  const all = await getProfiles();
+  const prof = all[bikeName] || blankProfile();
+  if (!prof.custom_parts[category]) prof.custom_parts[category] = [];
+  const exists = prof.custom_parts[category].some(
+    (p) => p.toLowerCase() === partName.toLowerCase()
+  );
+  if (!exists) prof.custom_parts[category].push(partName);
+  all[bikeName] = prof;
+  await saveProfiles(all);
+  return prof.custom_parts[category];
+}
+
+export async function removeCustomPart(bikeName, category, partName) {
+  const all = await getProfiles();
+  const prof = all[bikeName];
+  if (!prof?.custom_parts?.[category]) return null;
+  prof.custom_parts[category] = prof.custom_parts[category].filter(
+    (p) => p.toLowerCase() !== partName.toLowerCase()
+  );
+  // Also clear any events recorded against the deleted part
+  if (prof.parts[partName]) delete prof.parts[partName];
+  all[bikeName] = prof;
+  await saveProfiles(all);
+  return prof.custom_parts[category];
+}
+
 // Rename a bike everywhere it appears: in the registry, in the default-bike
 // pointer, and on every ride tagged with the old name. Pass null/empty as
 // newName to merge into "unassigned".
@@ -270,6 +398,19 @@ export async function renameBike(oldName, newName) {
       touched += 1;
     }
   }
+
+  // Migrate the profile (added_at, starting_km, parts, custom_parts)
+  const profiles = await getProfiles();
+  const oldKey = Object.keys(profiles).find(
+    (k) => k.toLowerCase() === oldTrim.toLowerCase()
+  );
+  if (oldKey) {
+    if (newTrim) {
+      profiles[newTrim] = profiles[oldKey];
+    }
+    if (oldKey !== newTrim) delete profiles[oldKey];
+    await saveProfiles(profiles);
+  }
   return { ok: true, touched };
 }
 
@@ -288,17 +429,28 @@ export async function deleteBikeEverywhere(name) {
     }
   }
   await removeBike(trimmed);
+  // Also drop the maintenance profile
+  const profiles = await getProfiles();
+  const key = Object.keys(profiles).find(
+    (k) => k.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (key) {
+    delete profiles[key];
+    await saveProfiles(profiles);
+  }
   return { ok: true, touched };
 }
 
 // Aggregate usage stats per bike across every activity.
-// Returns: [{ name, ride_count, distance_m, moving_time_s, elevation_gain_m, last_used_iso, is_default }]
+// Returns: [{ name, ride_count, distance_m, moving_time_s, elevation_gain_m, last_used_iso, is_default,
+//             added_at, starting_km, total_km }]
 // plus an `unassigned` entry at the end if any rides have no bike.
 export async function getBikeStats() {
-  const [rides, defBike, registry] = await Promise.all([
+  const [rides, defBike, registry, profiles] = await Promise.all([
     getAll("rides"),
     getDefaultBike(),
     listBikes(),
+    getProfiles(),
   ]);
 
   const buckets = new Map();
@@ -342,16 +494,23 @@ export async function getBikeStats() {
     }
   }
 
-  // Round + flag default
+  // Round + flag default + merge profile fields
   const list = [];
   for (const [, b] of buckets) {
     if (b.name === "__unassigned__") continue;
+    const profKey = Object.keys(profiles).find((k) => k.toLowerCase() === b.name.toLowerCase());
+    const prof = profKey ? profiles[profKey] : null;
+    const startingKm = prof?.starting_km || 0;
+    const riddenKm = b.distance_m / 1000;
     list.push({
       ...b,
       distance_m: Math.round(b.distance_m * 10) / 10,
       moving_time_s: Math.round(b.moving_time_s),
       elevation_gain_m: Math.round(b.elevation_gain_m),
       is_default: defBike && b.name.toLowerCase() === defBike.toLowerCase(),
+      added_at: prof?.added_at || null,
+      starting_km: startingKm,
+      total_km: Math.round((startingKm + riddenKm) * 10) / 10,
     });
   }
   // Sort: default first, then most-recently-used, then by ride count
