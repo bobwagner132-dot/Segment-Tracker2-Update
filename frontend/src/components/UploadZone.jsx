@@ -8,6 +8,7 @@ export default function UploadZone({
   label = "Drop GPX file here",
   sublabel = "or click to browse",
   testid = "upload-zone",
+  compact = false,
 }) {
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
