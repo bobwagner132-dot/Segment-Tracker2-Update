@@ -170,11 +170,8 @@ export default function Backup({ embedded = false }) {
     >
       {!embedded && (
         <div>
-          <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">/ / Backup</div>
-          <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
-            Data Control
-          </h1>
-          <p className="text-secondary text-sm mt-4">
+          <div className="font-display font-black text-2xl md:text-4xl tracking-[0.2em] uppercase text-accent">/ / Backup</div>
+          <p className="text-secondary text-sm mt-3">
             Save a JSON snapshot of every segment, ride, and detected effort into a folder of your
             choice. Restore from the same folder to return to exactly where you left off.
           </p>

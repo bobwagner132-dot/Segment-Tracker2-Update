@@ -56,12 +56,9 @@ export default function Leaderboards() {
   return (
     <div className="space-y-8 animate-fade-up" data-testid="leaderboards-page">
       <div>
-        <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">
+        <div className="font-display font-black text-2xl md:text-4xl tracking-[0.2em] uppercase text-accent">
           / / Leaderboards
         </div>
-        <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
-          Fastest Times
-        </h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

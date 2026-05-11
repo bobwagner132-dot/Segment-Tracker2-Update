@@ -38,13 +38,10 @@ export default function Dashboard() {
   return (
     <div className="space-y-10 animate-fade-up" data-testid="dashboard-page">
       <div>
-        <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">
+        <div className="font-display font-black text-2xl md:text-4xl tracking-[0.2em] uppercase text-accent">
           / / Overview
         </div>
-        <h1 className="font-display font-black text-5xl md:text-7xl uppercase tracking-tighter leading-[0.9]">
-          Dash<span className="text-accent">board</span>
-        </h1>
-        <p className="text-secondary text-sm mt-4 max-w-xl">
+        <p className="text-secondary text-sm mt-3 max-w-xl">
           Every segment. Every activity. Every effort. Tracked locally, analysed with precision.
         </p>
 

@@ -153,10 +153,7 @@ export default function Rides() {
   return (
     <div className="space-y-8 animate-fade-up" data-testid="rides-page">
       <div>
-        <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">/ / Activities</div>
-        <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
-          Your Logbook
-        </h1>
+        <div className="font-display font-black text-2xl md:text-4xl tracking-[0.2em] uppercase text-accent">/ / Activities</div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">

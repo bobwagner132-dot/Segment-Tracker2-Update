@@ -9,13 +9,10 @@ export default function Preferences() {
   return (
     <div className="space-y-8 animate-fade-up max-w-3xl" data-testid="preferences-page">
       <div>
-        <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">
+        <div className="font-display font-black text-2xl md:text-4xl tracking-[0.2em] uppercase text-accent">
           / / Settings
         </div>
-        <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
-          Tune the cockpit
-        </h1>
-        <p className="text-secondary text-sm mt-4">
+        <p className="text-secondary text-sm mt-3">
           Personal settings for this device. Stored locally — no account required.
         </p>
       </div>

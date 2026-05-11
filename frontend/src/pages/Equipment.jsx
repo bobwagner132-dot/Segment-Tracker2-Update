@@ -82,11 +82,8 @@ export default function Equipment() {
   return (
     <div className="space-y-8 animate-fade-up max-w-5xl" data-testid="equipment-page">
       <div>
-        <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">/ / Equipment</div>
-        <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
-          Bike Garage
-        </h1>
-        <p className="text-secondary text-sm mt-4 max-w-xl">
+        <div className="font-display font-black text-2xl md:text-4xl tracking-[0.2em] uppercase text-accent">/ / Equipment</div>
+        <p className="text-secondary text-sm mt-3 max-w-xl">
           Track which bike you rode for every activity. Set a default and it'll be applied to new
           uploads automatically.
         </p>
