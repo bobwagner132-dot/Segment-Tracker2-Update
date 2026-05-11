@@ -4,6 +4,7 @@ import { deleteAllRides, getStats, listRides, listSegments } from "../lib/api";
 import { Map, Route, Trophy, Activity, ArrowRight, Trash2 } from "lucide-react";
 import { fmtDistance, fmtTime, fmtDateLocal } from "../lib/api";
 import ConfirmDialog from "../components/ConfirmDialog";
+import YearlyStatsBlock from "../components/YearlyStatsBlock";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -70,6 +71,8 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      <YearlyStatsBlock />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="stats-grid">
         {cards.map((c) => (

@@ -29,7 +29,7 @@ const FS_SUPPORTED = isFsAccessSupported();
 const IN_IFRAME = typeof window !== "undefined" && window.self !== window.top;
 const FS_USABLE = FS_SUPPORTED && !IN_IFRAME;
 
-export default function Backup() {
+export default function Backup({ embedded = false }) {
   const [busy, setBusy] = useState(false);
   const [dirName, setDirName] = useState(null);
   const [restorePicker, setRestorePicker] = useState(null); // array of backup files when choosing
@@ -160,17 +160,26 @@ export default function Backup() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-up max-w-3xl" data-testid="backup-page">
-      <div>
-        <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">/ / Backup</div>
-        <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
-          Data Control
-        </h1>
-        <p className="text-secondary text-sm mt-4">
-          Save a JSON snapshot of every segment, ride, and detected effort into a folder of your
-          choice. Restore from the same folder to return to exactly where you left off.
-        </p>
-      </div>
+    <div
+      className={
+        embedded
+          ? "space-y-6"
+          : "space-y-8 animate-fade-up max-w-3xl"
+      }
+      data-testid="backup-page"
+    >
+      {!embedded && (
+        <div>
+          <div className="text-[10px] tracking-[0.4em] uppercase text-accent mb-3">/ / Backup</div>
+          <h1 className="font-display font-black text-4xl md:text-6xl uppercase tracking-tighter leading-[0.9]">
+            Data Control
+          </h1>
+          <p className="text-secondary text-sm mt-4">
+            Save a JSON snapshot of every segment, ride, and detected effort into a folder of your
+            choice. Restore from the same folder to return to exactly where you left off.
+          </p>
+        </div>
+      )}
 
       {/* Folder card */}
       <div className="border border-line bg-surface p-6" data-testid="folder-card">

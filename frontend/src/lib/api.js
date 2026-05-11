@@ -687,6 +687,102 @@ export async function getStats() {
   return { segments, rides, efforts };
 }
 
+// Yearly aggregates for Dashboard graphs.
+// Returns:
+//   year, years[]              — available years derived from ride start_time
+//   months[12]                 — { month, label, distance_km, elevation_m, ride_count }
+//   cumulative[]               — running totals over the year, one entry per ride
+//                                (plus a leading Jan-1 zero and a trailing year-end pad)
+//   totals                     — { distance_km, elevation_m, ride_count } for the year
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export async function getYearlyStats(year) {
+  const rides = await getAll("rides");
+
+  const yearsSet = new Set();
+  for (const r of rides) {
+    const t = r.start_time || r.created_at;
+    if (t) {
+      const d = new Date(t);
+      if (!Number.isNaN(d.getTime())) yearsSet.add(d.getFullYear());
+    }
+  }
+  const years = [...yearsSet].sort((a, b) => b - a);
+  const targetYear = year || years[0] || new Date().getFullYear();
+
+  const months = MONTH_LABELS.map((label, idx) => ({
+    month: idx,
+    label,
+    distance_km: 0,
+    elevation_m: 0,
+    ride_count: 0,
+  }));
+
+  const inYear = rides
+    .filter((r) => {
+      const t = r.start_time || r.created_at;
+      if (!t) return false;
+      const d = new Date(t);
+      return !Number.isNaN(d.getTime()) && d.getFullYear() === targetYear;
+    })
+    .sort((a, b) => {
+      const ta = new Date(a.start_time || a.created_at).getTime();
+      const tb = new Date(b.start_time || b.created_at).getTime();
+      return ta - tb;
+    });
+
+  for (const r of inYear) {
+    const d = new Date(r.start_time || r.created_at);
+    const m = d.getMonth();
+    months[m].distance_km += (r.distance_m || 0) / 1000;
+    months[m].elevation_m += r.elevation_gain_m || 0;
+    months[m].ride_count += 1;
+  }
+  for (const m of months) {
+    m.distance_km = Math.round(m.distance_km * 10) / 10;
+    m.elevation_m = Math.round(m.elevation_m);
+  }
+
+  let cd = 0;
+  let ce = 0;
+  const cumulative = [
+    {
+      t: new Date(targetYear, 0, 1).getTime(),
+      distance_km: 0,
+      elevation_m: 0,
+    },
+  ];
+  for (const r of inYear) {
+    cd += (r.distance_m || 0) / 1000;
+    ce += r.elevation_gain_m || 0;
+    cumulative.push({
+      t: new Date(r.start_time || r.created_at).getTime(),
+      distance_km: Math.round(cd * 10) / 10,
+      elevation_m: Math.round(ce),
+    });
+  }
+  // Pad to year-end so the line extends fully across the chart
+  const now = Date.now();
+  const yearEnd = Math.min(new Date(targetYear, 11, 31, 23, 59).getTime(), now);
+  if (cumulative[cumulative.length - 1].t < yearEnd) {
+    cumulative.push({
+      ...cumulative[cumulative.length - 1],
+      t: yearEnd,
+    });
+  }
+
+  return {
+    year: targetYear,
+    years,
+    months,
+    cumulative,
+    totals: {
+      distance_km: Math.round(cd * 10) / 10,
+      elevation_m: Math.round(ce),
+      ride_count: inYear.length,
+    },
+  };
+}
+
 // ---------- Backup / Restore ----------
 export async function downloadBackup() {
   const [segments, rides, efforts] = await Promise.all([
