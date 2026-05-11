@@ -19,9 +19,9 @@ body,
   --t-elevated: #141418;
   --t-subtle: rgba(255, 255, 255, 0.05);
   --t-text: #ffffff;
-  --t-text-secondary: rgba(255, 255, 255, 0.7);
-  --t-text-muted: rgba(255, 255, 255, 0.45);
-  --t-text-faint: rgba(255, 255, 255, 0.28);
+  --t-text-secondary: rgba(255, 255, 255, 0.82);
+  --t-text-muted: rgba(255, 255, 255, 0.62);
+  --t-text-faint: rgba(255, 255, 255, 0.42);
   --t-border: rgba(255, 255, 255, 0.1);
   --t-border-strong: rgba(255, 255, 255, 0.22);
   --t-border-subtle: rgba(255, 255, 255, 0.05);
@@ -40,9 +40,9 @@ body,
   --t-elevated: #eef0f4;
   --t-subtle: rgba(0, 0, 0, 0.04);
   --t-text: #0a0a0c;
-  --t-text-secondary: rgba(10, 10, 12, 0.72);
-  --t-text-muted: rgba(10, 10, 12, 0.5);
-  --t-text-faint: rgba(10, 10, 12, 0.32);
+  --t-text-secondary: rgba(10, 10, 12, 0.85);
+  --t-text-muted: rgba(10, 10, 12, 0.7);
+  --t-text-faint: rgba(10, 10, 12, 0.5);
   --t-border: rgba(10, 10, 12, 0.12);
   --t-border-strong: rgba(10, 10, 12, 0.28);
   --t-border-subtle: rgba(10, 10, 12, 0.06);

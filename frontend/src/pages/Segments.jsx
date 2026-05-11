@@ -8,6 +8,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import {
   deleteSegment,
   getSegment,
+  getStats,
   listSegments,
   uploadSegment,
   renameSegment,
@@ -23,10 +24,12 @@ export default function Segments() {
   const [search, setSearch] = useState("");
   const [params, setParams] = useSearchParams();
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [totalEffortCount, setTotalEffortCount] = useState(0);
 
   async function refresh() {
-    const s = await listSegments();
+    const [s, stats] = await Promise.all([listSegments(), getStats()]);
     setSegments(s);
+    setTotalEffortCount(stats.efforts);
     const qid = params.get("id");
     if (qid) {
       try {
@@ -93,12 +96,20 @@ export default function Segments() {
         </h1>
       </div>
 
-      <UploadZone
-        onUpload={handleUpload}
-        label="Drop Segment GPX"
-        sublabel="single-track GPX defining start → end"
-        testid="segment-upload"
-      />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-8">
+          <UploadZone
+            onUpload={handleUpload}
+            label="Drop Segment GPX"
+            sublabel="single-track GPX defining start → end"
+            testid="segment-upload"
+          />
+        </div>
+        <div className="lg:col-span-4 grid grid-cols-2 gap-3">
+          <StatCard label="Segments" value={segments.length} testid="seg-count-card" />
+          <StatCard label="Detected Efforts" value={totalEffortCount} testid="effort-count-card" />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div className="lg:col-span-4 border border-line bg-surface" data-testid="segments-list">
@@ -222,6 +233,18 @@ function Stat({ label, value, icon: Icon }) {
         {Icon && <Icon className="w-3 h-3" />} {label}
       </div>
       <div className="font-num text-3xl font-black mt-1">{value}</div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, testid }) {
+  return (
+    <div
+      className="border border-line bg-surface p-5 flex flex-col justify-between"
+      data-testid={testid}
+    >
+      <div className="text-[10px] tracking-[0.3em] uppercase text-muted">{label}</div>
+      <div className="font-num text-5xl font-black mt-2 leading-none">{value}</div>
     </div>
   );
 }

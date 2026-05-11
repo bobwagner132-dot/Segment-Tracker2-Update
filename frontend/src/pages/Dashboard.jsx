@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { deleteAllRides, getStats, listRides, listSegments } from "../lib/api";
-import { Map, Route, Trophy, Activity, ArrowRight, Trash2 } from "lucide-react";
+import { ArrowRight, Trash2 } from "lucide-react";
 import { fmtDistance, fmtTime, fmtDateLocal } from "../lib/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 import YearlyStatsBlock from "../components/YearlyStatsBlock";
@@ -35,12 +35,6 @@ export default function Dashboard() {
     await refresh();
   }
 
-  const cards = [
-    { label: "Segments", value: stats.segments, icon: Map, to: "/segments", testid: "stat-segments" },
-    { label: "Activities", value: stats.rides, icon: Route, to: "/rides", testid: "stat-rides" },
-    { label: "Detected Efforts", value: stats.efforts, icon: Trophy, to: "/leaderboards", testid: "stat-efforts" },
-  ];
-
   return (
     <div className="space-y-10 animate-fade-up" data-testid="dashboard-page">
       <div>
@@ -73,28 +67,6 @@ export default function Dashboard() {
       </div>
 
       <YearlyStatsBlock />
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="stats-grid">
-        {cards.map((c) => (
-          <Link
-            key={c.label}
-            to={c.to}
-            data-testid={c.testid}
-            className="border border-line bg-surface p-6 hover:bg-elevated hover:border-accent-50 transition-colors duration-150 group"
-          >
-            <div className="flex items-center justify-between">
-              <div className="text-[10px] tracking-[0.3em] uppercase text-muted">
-                {c.label}
-              </div>
-              <c.icon className="w-4 h-4 text-faint group-hover:text-accent" strokeWidth={1.5} />
-            </div>
-            <div className="font-num text-7xl font-black mt-3 leading-none">{c.value}</div>
-            <div className="mt-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-muted group-hover:text-accent">
-              View <ArrowRight className="w-3 h-3" />
-            </div>
-          </Link>
-        ))}
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="border border-line bg-surface p-6" data-testid="recent-rides">

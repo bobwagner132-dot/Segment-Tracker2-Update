@@ -13,8 +13,8 @@ import {
 import { getYearlyStats } from "../lib/api";
 import { Route as RouteIcon, Mountain, Calendar } from "lucide-react";
 
-const DISTANCE_COLOR = "#00E5FF";
-const ELEVATION_COLOR = "#CCFF00";
+const DISTANCE_COLOR = "#1E88E5"; // material blue 600 — bluer than the accent cyan
+const ELEVATION_COLOR = "#4A8F2C"; // darker olive/leaf green for clear contrast on light bg
 
 export default function YearlyStatsBlock() {
   const [year, setYear] = useState(null);
