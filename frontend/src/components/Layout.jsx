@@ -1,12 +1,13 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Activity, Map, Route, Trophy, DatabaseBackup, LayoutDashboard, Settings } from "lucide-react";
+import { Activity, Map, Route, Trophy, DatabaseBackup, LayoutDashboard, Settings, Bike } from "lucide-react";
 import { ThemeToggle } from "@/lib/theme";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
-  { to: "/segments", label: "Segments", icon: Map, testid: "nav-segments" },
   { to: "/rides", label: "Activities", icon: Route, testid: "nav-rides" },
+  { to: "/segments", label: "Segments", icon: Map, testid: "nav-segments" },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy, testid: "nav-leaderboards" },
+  { to: "/equipment", label: "Equipment", icon: Bike, testid: "nav-equipment" },
   { to: "/backup", label: "Backup", icon: DatabaseBackup, testid: "nav-backup" },
   { to: "/preferences", label: "Settings", icon: Settings, testid: "nav-preferences" },
 ];

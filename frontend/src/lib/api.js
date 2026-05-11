@@ -231,6 +231,153 @@ export async function removeBike(name) {
   return next;
 }
 
+// Rename a bike everywhere it appears: in the registry, in the default-bike
+// pointer, and on every ride tagged with the old name. Pass null/empty as
+// newName to merge into "unassigned".
+export async function renameBike(oldName, newName) {
+  const oldTrim = (oldName || "").toString().trim();
+  const newTrim = (newName || "").toString().trim();
+  if (!oldTrim) return { ok: false };
+
+  // Update registry list
+  const list = await listBikes();
+  if (newTrim) {
+    const filtered = list.filter(
+      (b) => b.toLowerCase() !== oldTrim.toLowerCase() && b.toLowerCase() !== newTrim.toLowerCase()
+    );
+    filtered.unshift(newTrim);
+    await setMeta(BIKE_LIST_KEY, filtered);
+  } else {
+    await setMeta(
+      BIKE_LIST_KEY,
+      list.filter((b) => b.toLowerCase() !== oldTrim.toLowerCase())
+    );
+  }
+
+  // Update default pointer
+  const def = await getDefaultBike();
+  if (def && def.toLowerCase() === oldTrim.toLowerCase()) {
+    await setMeta(DEFAULT_BIKE_KEY, newTrim || null);
+  }
+
+  // Update every ride tagged with the old bike
+  const rides = await getAll("rides");
+  let touched = 0;
+  for (const r of rides) {
+    if (r.bike_name && r.bike_name.toLowerCase() === oldTrim.toLowerCase()) {
+      r.bike_name = newTrim || null;
+      await put("rides", r);
+      touched += 1;
+    }
+  }
+  return { ok: true, touched };
+}
+
+// Clear the bike tag from every ride that uses `name` AND remove it from the
+// registry. Used by the Equipment page when the user wants to fully delete a bike.
+export async function deleteBikeEverywhere(name) {
+  const trimmed = (name || "").toString().trim();
+  if (!trimmed) return { ok: false };
+  const rides = await getAll("rides");
+  let touched = 0;
+  for (const r of rides) {
+    if (r.bike_name && r.bike_name.toLowerCase() === trimmed.toLowerCase()) {
+      r.bike_name = null;
+      await put("rides", r);
+      touched += 1;
+    }
+  }
+  await removeBike(trimmed);
+  return { ok: true, touched };
+}
+
+// Aggregate usage stats per bike across every activity.
+// Returns: [{ name, ride_count, distance_m, moving_time_s, elevation_gain_m, last_used_iso, is_default }]
+// plus an `unassigned` entry at the end if any rides have no bike.
+export async function getBikeStats() {
+  const [rides, defBike, registry] = await Promise.all([
+    getAll("rides"),
+    getDefaultBike(),
+    listBikes(),
+  ]);
+
+  const buckets = new Map();
+  function add(key, ride) {
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        name: key,
+        ride_count: 0,
+        distance_m: 0,
+        moving_time_s: 0,
+        elevation_gain_m: 0,
+        last_used_iso: null,
+      });
+    }
+    const b = buckets.get(key);
+    b.ride_count += 1;
+    b.distance_m += ride.distance_m || 0;
+    b.moving_time_s += ride.moving_time_s || ride.duration_s || 0;
+    b.elevation_gain_m += ride.elevation_gain_m || 0;
+    const t = ride.start_time || ride.created_at;
+    if (t && (!b.last_used_iso || t > b.last_used_iso)) b.last_used_iso = t;
+  }
+
+  for (const r of rides) {
+    const key = r.bike_name && r.bike_name.trim() ? r.bike_name.trim() : null;
+    if (key) add(key, r);
+    else add("__unassigned__", r);
+  }
+
+  // Ensure every registered bike has a row, even with zero rides
+  for (const name of registry) {
+    if (!buckets.has(name)) {
+      buckets.set(name, {
+        name,
+        ride_count: 0,
+        distance_m: 0,
+        moving_time_s: 0,
+        elevation_gain_m: 0,
+        last_used_iso: null,
+      });
+    }
+  }
+
+  // Round + flag default
+  const list = [];
+  for (const [, b] of buckets) {
+    if (b.name === "__unassigned__") continue;
+    list.push({
+      ...b,
+      distance_m: Math.round(b.distance_m * 10) / 10,
+      moving_time_s: Math.round(b.moving_time_s),
+      elevation_gain_m: Math.round(b.elevation_gain_m),
+      is_default: defBike && b.name.toLowerCase() === defBike.toLowerCase(),
+    });
+  }
+  // Sort: default first, then most-recently-used, then by ride count
+  list.sort((a, b) => {
+    if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
+    if (a.last_used_iso && b.last_used_iso && a.last_used_iso !== b.last_used_iso)
+      return b.last_used_iso.localeCompare(a.last_used_iso);
+    if (a.last_used_iso !== b.last_used_iso) return a.last_used_iso ? -1 : 1;
+    return b.ride_count - a.ride_count;
+  });
+
+  const unassigned = buckets.get("__unassigned__");
+  return {
+    bikes: list,
+    unassigned: unassigned
+      ? {
+          ...unassigned,
+          name: null,
+          distance_m: Math.round(unassigned.distance_m * 10) / 10,
+          moving_time_s: Math.round(unassigned.moving_time_s),
+          elevation_gain_m: Math.round(unassigned.elevation_gain_m),
+        }
+      : null,
+  };
+}
+
 // Helper to build the FIT-extra metadata block returned by the API surface.
 function rideMetadataView(r) {
   return {
