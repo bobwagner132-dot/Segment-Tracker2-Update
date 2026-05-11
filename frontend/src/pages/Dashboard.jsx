@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { deleteAllRides, getStats, listRides, listSegments } from "../lib/api";
-import { ArrowRight, Trash2 } from "lucide-react";
+import { ArrowRight, Trash2, Activity } from "lucide-react";
 import { fmtDistance, fmtTime, fmtDateLocal } from "../lib/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 import YearlyStatsBlock from "../components/YearlyStatsBlock";
