@@ -24,23 +24,63 @@ export function totalDistanceM(points) {
   return d;
 }
 
-export function elevationGainM(points) {
-  let gain = 0.0;
-  for (let i = 1; i < points.length; i++) {
-    const e1 = points[i - 1].ele;
-    const e2 = points[i].ele;
-    if (e1 != null && e2 != null && e2 > e1) gain += e2 - e1;
+// Sustained-gain elevation totals. A naive sum of every positive delta inflates
+// the total by GPS/barometric noise — every 0.3 m wobble on flat ground gets
+// counted as climbing. Instead we track the latest local extremes and only
+// commit a gain (or loss) once the trend has reversed by at least `threshold`
+// metres, which is the same idea Strava / Garmin use.
+const ELE_THRESHOLD_M = 3;
+
+export function elevationGainM(points, threshold = ELE_THRESHOLD_M) {
+  let gain = 0;
+  let base = null; // lowest point since last commit
+  let peak = null; // highest since base
+  for (const p of points) {
+    if (p.ele == null) continue;
+    if (base == null) {
+      base = p.ele;
+      peak = p.ele;
+      continue;
+    }
+    if (p.ele > peak) {
+      peak = p.ele;
+    } else if (peak - p.ele >= threshold) {
+      // Trend reversed enough to commit the climb base→peak
+      if (peak > base) gain += peak - base;
+      base = p.ele;
+      peak = p.ele;
+    } else if (p.ele < base) {
+      base = p.ele;
+      peak = p.ele;
+    }
   }
+  if (base != null && peak != null && peak > base) gain += peak - base;
   return gain;
 }
 
-export function elevationLossM(points) {
-  let loss = 0.0;
-  for (let i = 1; i < points.length; i++) {
-    const e1 = points[i - 1].ele;
-    const e2 = points[i].ele;
-    if (e1 != null && e2 != null && e2 < e1) loss += e1 - e2;
+export function elevationLossM(points, threshold = ELE_THRESHOLD_M) {
+  let loss = 0;
+  let crest = null; // highest point since last commit
+  let trough = null; // lowest since crest
+  for (const p of points) {
+    if (p.ele == null) continue;
+    if (crest == null) {
+      crest = p.ele;
+      trough = p.ele;
+      continue;
+    }
+    if (p.ele < trough) {
+      trough = p.ele;
+    } else if (p.ele - trough >= threshold) {
+      if (crest > trough) loss += crest - trough;
+      crest = p.ele;
+      trough = p.ele;
+    } else if (p.ele > crest) {
+      crest = p.ele;
+      trough = p.ele;
+    }
   }
+  if (crest != null && trough != null && crest > trough) loss += crest - trough;
   return loss;
 }
 

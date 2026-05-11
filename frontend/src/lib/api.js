@@ -13,6 +13,7 @@ import {
   elevationLossM,
   hashRide,
   hashSegment,
+  haversineM,
   totalDistanceM,
 } from "./detector";
 import {
@@ -607,15 +608,41 @@ export async function getBikeStats() {
 }
 
 // Helper to build the FIT-extra metadata block returned by the API surface.
+// For older rides that don't carry computed speeds we derive them lazily here
+// so the UI always has something to render.
 function rideMetadataView(r) {
+  let avgSpeed = r.avg_speed_mps ?? null;
+  if (avgSpeed == null && r.distance_m && r.duration_s) {
+    avgSpeed = r.distance_m / r.duration_s;
+  }
+  let maxSpeed = r.max_speed_mps ?? null;
+  if (maxSpeed == null && Array.isArray(r.points)) {
+    let m = 0;
+    for (const p of r.points) {
+      if (p.speed != null && Number.isFinite(p.speed) && p.speed > m) m = p.speed;
+    }
+    if (m === 0) {
+      for (let i = 1; i < r.points.length; i++) {
+        const a = r.points[i - 1];
+        const b = r.points[i];
+        if (!a?.t || !b?.t) continue;
+        const dt = (new Date(b.t).getTime() - new Date(a.t).getTime()) / 1000;
+        if (dt <= 0) continue;
+        const dm = haversineM(a.lat, a.lon, b.lat, b.lon);
+        const v = dm / dt;
+        if (Number.isFinite(v) && v > m) m = v;
+      }
+    }
+    if (m > 0) maxSpeed = m;
+  }
   return {
     sport: r.sport ?? null,
     sub_sport: r.sub_sport ?? null,
     device: r.device ?? null,
     bike_name: r.bike_name ?? null,
     moving_time_s: r.moving_time_s ?? null,
-    avg_speed_mps: r.avg_speed_mps ?? null,
-    max_speed_mps: r.max_speed_mps ?? null,
+    avg_speed_mps: avgSpeed,
+    max_speed_mps: maxSpeed,
     avg_heart_rate: r.avg_heart_rate ?? null,
     max_heart_rate: r.max_heart_rate ?? null,
     avg_cadence: r.avg_cadence ?? null,
@@ -800,6 +827,49 @@ export async function uploadRide(file) {
     if (defaultBike) bikeName = defaultBike;
   }
 
+  // Elevation: FIT session ascent/descent is more accurate than our point-by-point
+  // sum because the recorder already applies its own smoothing — prefer it.
+  const computedGain = elevationGainM(points);
+  const computedLoss = elevationLossM(points);
+  const sessionAscent =
+    parsed.meta?.total_ascent_m != null ? Number(parsed.meta.total_ascent_m) : null;
+  const sessionDescent =
+    parsed.meta?.total_descent_m != null ? Number(parsed.meta.total_descent_m) : null;
+  const finalGain = sessionAscent != null ? sessionAscent : computedGain;
+  const finalLoss = sessionDescent != null ? sessionDescent : computedLoss;
+
+  // Speed: FIT session values win, otherwise compute from points / duration.
+  const totalDistM = totalDistanceM(points);
+  let avgSpeed =
+    parsed.meta?.avg_speed_mps != null ? Number(parsed.meta.avg_speed_mps) : null;
+  if (avgSpeed == null && durationS > 0 && totalDistM > 0) {
+    avgSpeed = totalDistM / durationS;
+  }
+  let maxSpeed =
+    parsed.meta?.max_speed_mps != null ? Number(parsed.meta.max_speed_mps) : null;
+  if (maxSpeed == null) {
+    // Use whichever speed source the point stream carries; otherwise derive
+    // from consecutive haversine distance / time deltas.
+    let m = 0;
+    for (let i = 0; i < points.length; i++) {
+      const s = points[i].speed;
+      if (s != null && Number.isFinite(s) && s > m) m = s;
+    }
+    if (m === 0) {
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1];
+        const b = points[i];
+        if (!a.t || !b.t) continue;
+        const dt = (new Date(b.t).getTime() - new Date(a.t).getTime()) / 1000;
+        if (dt <= 0) continue;
+        const dm = haversineM(a.lat, a.lon, b.lat, b.lon);
+        const v = dm / dt;
+        if (Number.isFinite(v) && v > m) m = v;
+      }
+    }
+    if (m > 0) maxSpeed = m;
+  }
+
   const rideDoc = {
     id: rideId,
     name: finalName,
@@ -807,9 +877,9 @@ export async function uploadRide(file) {
     source_type: sourceType,
     start_time: startTime,
     duration_s: durationS,
-    distance_m: Math.round(totalDistanceM(points) * 10) / 10,
-    elevation_gain_m: Math.round(elevationGainM(points) * 10) / 10,
-    elevation_loss_m: Math.round(elevationLossM(points) * 10) / 10,
+    distance_m: Math.round(totalDistM * 10) / 10,
+    elevation_gain_m: Math.round(finalGain * 10) / 10,
+    elevation_loss_m: Math.round(finalLoss * 10) / 10,
     points,
     created_at: new Date().toISOString(),
     // FIT metadata (null for GPX rides)
@@ -818,8 +888,8 @@ export async function uploadRide(file) {
     device: parsed.meta?.device || null,
     bike_name: bikeName,
     moving_time_s: parsed.meta?.moving_time_s || null,
-    avg_speed_mps: parsed.meta?.avg_speed_mps || null,
-    max_speed_mps: parsed.meta?.max_speed_mps || null,
+    avg_speed_mps: avgSpeed,
+    max_speed_mps: maxSpeed,
     avg_heart_rate: parsed.meta?.avg_heart_rate || null,
     max_heart_rate: parsed.meta?.max_heart_rate || null,
     avg_cadence: parsed.meta?.avg_cadence || null,
@@ -828,8 +898,8 @@ export async function uploadRide(file) {
     max_power: parsed.meta?.max_power || null,
     normalized_power: parsed.meta?.normalized_power || null,
     total_calories: parsed.meta?.total_calories || null,
-    total_ascent_m: parsed.meta?.total_ascent_m || null,
-    total_descent_m: parsed.meta?.total_descent_m || null,
+    total_ascent_m: sessionAscent != null ? sessionAscent : Math.round(computedGain * 10) / 10,
+    total_descent_m: sessionDescent != null ? sessionDescent : Math.round(computedLoss * 10) / 10,
     avg_temperature: parsed.meta?.avg_temperature || null,
     max_temperature: parsed.meta?.max_temperature || null,
     min_temperature: parsed.meta?.min_temperature || null,
@@ -996,8 +1066,12 @@ export async function getYearlyStats(year) {
   for (const r of inYear) {
     const d = new Date(r.start_time || r.created_at);
     const m = d.getMonth();
+    // Prefer the FIT session's authoritative total_ascent if it's there —
+    // the device's own value avoids the GPS-noise inflation that a raw
+    // point-by-point sum suffers from.
+    const ele = r.total_ascent_m != null ? r.total_ascent_m : r.elevation_gain_m || 0;
     months[m].distance_km += (r.distance_m || 0) / 1000;
-    months[m].elevation_m += r.elevation_gain_m || 0;
+    months[m].elevation_m += ele;
     months[m].ride_count += 1;
   }
   for (const m of months) {
@@ -1016,7 +1090,7 @@ export async function getYearlyStats(year) {
   ];
   for (const r of inYear) {
     cd += (r.distance_m || 0) / 1000;
-    ce += r.elevation_gain_m || 0;
+    ce += r.total_ascent_m != null ? r.total_ascent_m : r.elevation_gain_m || 0;
     cumulative.push({
       t: new Date(r.start_time || r.created_at).getTime(),
       distance_km: Math.round(cd * 10) / 10,

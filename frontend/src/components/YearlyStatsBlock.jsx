@@ -4,7 +4,7 @@ import {
   BarChart,
   CartesianGrid,
   Line,
-  ComposedChart,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -97,8 +97,29 @@ export default function YearlyStatsBlock() {
         />
       </div>
 
-      {/* Full-width cumulative line chart */}
-      <CumulativeChart cumulative={data.cumulative} year={data.year} />
+      {/* Full-width cumulative line charts — split so the two scales don't fight */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <CumulativeChart
+          cumulative={data.cumulative}
+          year={data.year}
+          dataKey="distance_km"
+          unit="km"
+          color={DISTANCE_COLOR}
+          icon={RouteIcon}
+          title="Cumulative distance"
+          testid="cumulative-distance"
+        />
+        <CumulativeChart
+          cumulative={data.cumulative}
+          year={data.year}
+          dataKey="elevation_m"
+          unit="m"
+          color={ELEVATION_COLOR}
+          icon={Mountain}
+          title="Cumulative elevation"
+          testid="cumulative-elevation"
+        />
+      </div>
     </div>
   );
 }
@@ -159,7 +180,7 @@ function MonthlyBar({ data, dataKey, unit, color, title, icon: Icon, testid }) {
   );
 }
 
-function CumulativeChart({ cumulative, year }) {
+function CumulativeChart({ cumulative, year, dataKey, unit, color, title, icon: Icon, testid }) {
   const yearStart = useMemo(() => new Date(year, 0, 1).getTime(), [year]);
   const yearEnd = useMemo(() => new Date(year, 11, 31, 23, 59).getTime(), [year]);
 
@@ -169,24 +190,16 @@ function CumulativeChart({ cumulative, year }) {
   }, [year]);
 
   return (
-    <div className="border border-line bg-surface p-4" data-testid="cumulative-chart">
+    <div className="border border-line bg-surface p-4" data-testid={testid}>
       <div className="flex items-center justify-between mb-3 gap-4">
-        <div className="text-[10px] tracking-[0.3em] uppercase text-muted">
-          Cumulative progress · {year}
+        <div className="text-[10px] tracking-[0.3em] uppercase text-muted flex items-center gap-2">
+          {Icon && <Icon className="w-3 h-3" style={{ color }} />}
+          {title}
         </div>
-        <div className="flex items-center gap-4 text-[10px] tracking-[0.3em] uppercase">
-          <span className="flex items-center gap-1" style={{ color: DISTANCE_COLOR }}>
-            <span className="w-3 h-0.5" style={{ background: DISTANCE_COLOR }} />
-            Distance
-          </span>
-          <span className="flex items-center gap-1" style={{ color: ELEVATION_COLOR }}>
-            <span className="w-3 h-0.5" style={{ background: ELEVATION_COLOR }} />
-            Elevation
-          </span>
-        </div>
+        <div className="text-[10px] tracking-[0.2em] uppercase text-faint">{unit}</div>
       </div>
-      <ResponsiveContainer width="100%" height={260}>
-        <ComposedChart data={cumulative} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={cumulative} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="rgba(127,127,127,0.12)" vertical={false} />
           <XAxis
             dataKey="t"
@@ -202,23 +215,12 @@ function CumulativeChart({ cumulative, year }) {
             axisLine={false}
           />
           <YAxis
-            yAxisId="left"
-            stroke={DISTANCE_COLOR}
+            stroke={color}
             fontSize={10}
             tickLine={false}
             axisLine={false}
             width={48}
-            tickFormatter={(v) => `${v} km`}
-          />
-          <YAxis
-            yAxisId="right"
-            orientation="right"
-            stroke={ELEVATION_COLOR}
-            fontSize={10}
-            tickLine={false}
-            axisLine={false}
-            width={56}
-            tickFormatter={(v) => `${v} m`}
+            tickFormatter={(v) => `${v}`}
           />
           <Tooltip
             contentStyle={{
@@ -234,33 +236,18 @@ function CumulativeChart({ cumulative, year }) {
                 day: "numeric",
               })
             }
-            formatter={(v, n) =>
-              n === "Distance"
-                ? [`${v} km`, "Distance"]
-                : [`${v} m`, "Elevation"]
-            }
+            formatter={(v) => [`${v} ${unit}`, title]}
           />
           <Line
-            yAxisId="left"
             type="monotone"
-            dataKey="distance_km"
-            name="Distance"
-            stroke={DISTANCE_COLOR}
+            dataKey={dataKey}
+            name={title}
+            stroke={color}
             strokeWidth={2.5}
             dot={false}
             isAnimationActive={false}
           />
-          <Line
-            yAxisId="right"
-            type="monotone"
-            dataKey="elevation_m"
-            name="Elevation"
-            stroke={ELEVATION_COLOR}
-            strokeWidth={2.5}
-            dot={false}
-            isAnimationActive={false}
-          />
-        </ComposedChart>
+        </LineChart>
       </ResponsiveContainer>
     </div>
   );

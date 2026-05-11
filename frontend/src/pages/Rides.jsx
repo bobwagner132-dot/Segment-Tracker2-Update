@@ -167,8 +167,27 @@ export default function Rides() {
             compact
           />
         </div>
-        <div className="sm:w-72 flex-shrink-0">
+        <div className="sm:w-[420px] flex-shrink-0 grid grid-cols-2 gap-3">
           <StatCard label="Activities" value={rides.length} testid="ride-count-card" />
+          <StatCard
+            label={`${new Date().getFullYear()} km`}
+            value={
+              Math.round(
+                rides
+                  .filter((r) => {
+                    const t = r.start_time || r.created_at;
+                    if (!t) return false;
+                    const d = new Date(t);
+                    return (
+                      !Number.isNaN(d.getTime()) &&
+                      d.getFullYear() === new Date().getFullYear()
+                    );
+                  })
+                  .reduce((acc, r) => acc + (r.distance_m || 0), 0) / 100
+              ) / 10
+            }
+            testid="ride-year-km-card"
+          />
         </div>
       </div>
 
