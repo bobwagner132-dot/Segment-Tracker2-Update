@@ -15,6 +15,7 @@ import {
 import {
   addCustomPart,
   addPartEvent,
+  BIKE_TYPES,
   deletePartEvent,
   getBikeProfileWithStats,
   removeCustomPart,
@@ -54,6 +55,10 @@ export default function BikeDetail() {
     await updateBikeProfile(decoded, { starting_km: value });
     await refresh();
   }
+  async function saveType(value) {
+    await updateBikeProfile(decoded, { type: value || null });
+    await refresh();
+  }
 
   function toggleCat(cat) {
     setOpenCats((cur) => {
@@ -79,7 +84,7 @@ export default function BikeDetail() {
       </div>
 
       {/* Top bar — stats & editable fields */}
-      <div className="border border-line bg-surface p-5 grid grid-cols-2 md:grid-cols-4 gap-5">
+      <div className="border border-line bg-surface p-5 grid grid-cols-2 md:grid-cols-5 gap-5">
         <Stat label="Activities" value={`${profile.ridden_km.toFixed(1)} km`} icon={RouteIcon} />
         <Stat label="Starting km" editable value={profile.starting_km} onChange={saveStartingKm} suffix="km" testid="bike-starting-km" />
         <Stat label="Total km" value={`${profile.total_km.toFixed(1)} km`} highlight />
@@ -92,6 +97,21 @@ export default function BikeDetail() {
           icon={Calendar}
           testid="bike-added-at"
         />
+        <div data-testid="bike-type">
+          <div className="text-[10px] tracking-[0.3em] uppercase text-muted">Type</div>
+          <select
+            value={profile.type || ""}
+            onChange={(e) => saveType(e.target.value)}
+            className="mt-1 w-full font-num text-2xl font-black bg-transparent border-b border-line hover:border-accent focus:border-accent focus:outline-none"
+          >
+            <option value="">—</option>
+            {BIKE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Maintenance log */}

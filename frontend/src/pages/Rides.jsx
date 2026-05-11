@@ -156,17 +156,18 @@ export default function Rides() {
         <div className="font-display font-black text-2xl md:text-4xl tracking-[0.2em] uppercase text-accent">/ / Activities</div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8">
+      <div className="flex flex-col sm:flex-row items-stretch gap-3">
+        <div className="flex-1 min-w-0">
           <UploadZone
             onUpload={handleUpload}
             accept=".gpx,.fit"
             label="Drop Activity GPX or FIT"
             sublabel="timestamps, HR, power, cadence, temperature & calories extracted"
             testid="ride-upload"
+            compact
           />
         </div>
-        <div className="lg:col-span-4 grid grid-cols-1 gap-3">
+        <div className="sm:w-72 flex-shrink-0">
           <StatCard label="Activities" value={rides.length} testid="ride-count-card" />
         </div>
       </div>
@@ -754,11 +755,11 @@ function Stat({ label, value, icon: Icon }) {
 function StatCard({ label, value, testid }) {
   return (
     <div
-      className="border border-line bg-surface p-5 flex flex-col justify-between"
+      className="border border-line bg-surface px-4 py-2 flex items-center justify-between h-full"
       data-testid={testid}
     >
       <div className="text-[10px] tracking-[0.3em] uppercase text-muted">{label}</div>
-      <div className="font-num text-5xl font-black mt-2 leading-none">{value}</div>
+      <div className="font-num text-2xl font-black leading-none">{value}</div>
     </div>
   );
 }

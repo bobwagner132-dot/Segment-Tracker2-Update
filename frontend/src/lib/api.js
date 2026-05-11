@@ -75,7 +75,13 @@ class ApiError extends Error {
 // ---------- Segments ----------
 export async function listSegments() {
   const segs = await getAll("segments");
-  segs.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  // Alphabetical by name (case-insensitive); ties broken by created_at desc
+  segs.sort((a, b) => {
+    const an = (a.name || "").toLowerCase();
+    const bn = (b.name || "").toLowerCase();
+    if (an !== bn) return an.localeCompare(bn);
+    return (b.created_at || "").localeCompare(a.created_at || "");
+  });
   return segs.map((s) => ({
     id: s.id,
     name: s.name,
@@ -181,8 +187,55 @@ export async function renameSegment(id, name) {
 // Persisted in the IndexedDB `meta` store:
 //   bike_names    : array of unique bike names (insertion-ordered, most-recent first)
 //   default_bike  : string — bike to assign to new activities that don't carry one
+//   bike_profiles : map name -> { added_at, starting_km, type, parts, custom_parts }
 const BIKE_LIST_KEY = "bike_names";
 const DEFAULT_BIKE_KEY = "default_bike";
+
+// User-facing bike types — also used to match FIT `sub_sport` on upload.
+export const BIKE_TYPES = [
+  "Road",
+  "Gravel",
+  "Mountain",
+  "Cyclocross",
+  "Indoor",
+  "Commute",
+  "Touring",
+  "E-bike",
+  "Track",
+  "Other",
+];
+
+// Aliases for Garmin sub_sport values that may come in as either the raw
+// snake_case form or the parsers' Title Case form (e.g. "Gravel Cycling").
+const TYPE_SUB_SPORT_ALIASES = {
+  road: ["road", "road cycling"],
+  gravel: ["gravel", "gravel cycling"],
+  mountain: ["mountain", "mountain biking", "downhill", "enduro_mountain", "enduro mountain"],
+  cyclocross: ["cyclocross", "cyclo cross", "cyclo_cross"],
+  indoor: ["indoor", "indoor cycling", "spin", "virtual cycling", "virtual_activity"],
+  commute: ["commute", "commuting"],
+  touring: ["touring", "bike touring"],
+  "e-bike": ["e-bike", "e bike", "ebike", "e_bike_fitness", "e bike fitness", "electric bike", "electric_bike"],
+  track: ["track", "track cycling"],
+  other: ["other", "generic", "cycling"],
+};
+
+function _norm(s) {
+  return (s || "").toString().trim().toLowerCase();
+}
+
+// Returns true if a bike's `type` field matches an activity's `sub_sport`.
+export function typeMatchesSubSport(type, subSport) {
+  const t = _norm(type);
+  const s = _norm(subSport);
+  if (!t || !s) return false;
+  if (t === s) return true;
+  const aliases = TYPE_SUB_SPORT_ALIASES[t] || [t];
+  return aliases.some((a) => {
+    const al = _norm(a);
+    return s === al || s.includes(al) || al.includes(s);
+  });
+}
 
 export async function listBikes() {
   const list = (await getMeta(BIKE_LIST_KEY)) || [];
@@ -205,7 +258,8 @@ export async function setDefaultBike(name) {
 }
 
 // Add (or move-to-front) a bike in the registry, and adopt it as the default.
-export async function addBike(name) {
+// Optionally persist a `type` (Road, Gravel, …) in the bike's profile.
+export async function addBike(name, type = null) {
   const trimmed = (name || "").toString().trim();
   if (!trimmed) return null;
   const existing = await listBikes();
@@ -216,6 +270,17 @@ export async function addBike(name) {
   // De-dup case-insensitive while preserving the user's original casing
   await setMeta(BIKE_LIST_KEY, filtered);
   await setMeta(DEFAULT_BIKE_KEY, trimmed);
+  // Seed / update the profile with the optional type
+  if (type !== undefined) {
+    const profiles = await getProfiles();
+    const key =
+      Object.keys(profiles).find((k) => k.toLowerCase() === trimmed.toLowerCase()) ||
+      trimmed;
+    const prof = profiles[key] || blankProfile();
+    if (type) prof.type = type;
+    profiles[key] = prof;
+    await saveProfiles(profiles);
+  }
   return trimmed;
 }
 
@@ -245,6 +310,7 @@ function blankProfile() {
   return {
     added_at: new Date().toISOString().slice(0, 10),
     starting_km: 0,
+    type: null, // Road, Gravel, Mountain, …
     parts: {}, // partKey -> { events: [...] }
     custom_parts: {}, // category -> [partName,...]
   };
@@ -281,6 +347,7 @@ export async function getBikeProfileWithStats(name) {
     name,
     added_at: prof.added_at || null,
     starting_km: prof.starting_km || 0,
+    type: prof.type || null,
     parts: prof.parts || {},
     custom_parts: prof.custom_parts || {},
     ridden_km,
@@ -297,6 +364,7 @@ export async function updateBikeProfile(name, patch) {
     const n = parseFloat(patch.starting_km);
     prof.starting_km = Number.isFinite(n) && n >= 0 ? n : 0;
   }
+  if ("type" in patch) prof.type = patch.type || null;
   all[name] = prof;
   await saveProfiles(all);
   return prof;
@@ -510,6 +578,7 @@ export async function getBikeStats() {
       is_default: defBike && b.name.toLowerCase() === defBike.toLowerCase(),
       added_at: prof?.added_at || null,
       starting_km: startingKm,
+      type: prof?.type || null,
       total_km: Math.round((startingKm + riddenKm) * 10) / 10,
     });
   }
@@ -693,14 +762,42 @@ export async function uploadRide(file) {
       parsedName.toLowerCase().endsWith("ride"));
   const finalName = useAuto ? autoName : parsedName || baseFilename;
 
-  // Resolve bike: file metadata wins, otherwise the user's default bike.
+  // Resolve bike. Precedence:
+  //   1. The FIT file's own bike_name (if present)
+  //   2. Else if the activity has a sub_sport:
+  //        a. Default bike, if its `type` matches the sub_sport
+  //        b. Else the first other bike whose `type` matches
+  //        c. Else null (leave blank)
+  //   3. Else (GPX or no sub_sport) the user's default bike
   let bikeName = parsed.meta?.bike_name || null;
-  if (!bikeName) {
-    const defaultBike = await getDefaultBike();
-    if (defaultBike) bikeName = defaultBike;
-  } else {
+  const subSport = parsed.meta?.sub_sport || null;
+  if (bikeName) {
     // FIT supplied a bike name — make sure it's in the registry too
     await addBike(bikeName);
+  } else if (subSport) {
+    const [defaultBike, registry, profiles] = await Promise.all([
+      getDefaultBike(),
+      listBikes(),
+      getProfiles(),
+    ]);
+    const findProf = (n) =>
+      profiles[
+        Object.keys(profiles).find((k) => k.toLowerCase() === (n || "").toLowerCase())
+      ];
+    const defProf = defaultBike ? findProf(defaultBike) : null;
+    if (defProf?.type && typeMatchesSubSport(defProf.type, subSport)) {
+      bikeName = defaultBike;
+    } else {
+      const match = registry.find((b) => {
+        if (defaultBike && b.toLowerCase() === defaultBike.toLowerCase()) return false;
+        const p = findProf(b);
+        return p?.type && typeMatchesSubSport(p.type, subSport);
+      });
+      bikeName = match || null;
+    }
+  } else {
+    const defaultBike = await getDefaultBike();
+    if (defaultBike) bikeName = defaultBike;
   }
 
   const rideDoc = {

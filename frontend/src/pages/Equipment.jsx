@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   addBike,
+  BIKE_TYPES,
   deleteBikeEverywhere,
   fmtDateLocal,
   fmtDistance,
@@ -24,6 +25,7 @@ import {
   getBikeStats,
   renameBike,
   setDefaultBike,
+  updateBikeProfile,
 } from "../lib/api";
 import ConfirmDialog from "../components/ConfirmDialog";
 
@@ -31,6 +33,7 @@ export default function Equipment() {
   const [bikes, setBikes] = useState([]);
   const [unassigned, setUnassigned] = useState(null);
   const [newBike, setNewBike] = useState("");
+  const [newType, setNewType] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
 
@@ -49,9 +52,12 @@ export default function Equipment() {
     if (!trimmed) return;
     setBusy(true);
     try {
-      await addBike(trimmed);
+      await addBike(trimmed, newType || null);
       setNewBike("");
-      toast.success(`${trimmed} added and set as default`);
+      setNewType("");
+      toast.success(
+        newType ? `${trimmed} (${newType}) added` : `${trimmed} added`
+      );
       await refresh();
     } finally {
       setBusy(false);
@@ -93,7 +99,7 @@ export default function Equipment() {
       {/* Add bike */}
       <div className="border border-line bg-surface p-5">
         <div className="text-[10px] tracking-[0.3em] uppercase text-muted mb-3">Add a bike</div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch gap-3">
           <input
             value={newBike}
             onChange={(e) => setNewBike(e.target.value)}
@@ -104,15 +110,31 @@ export default function Equipment() {
             data-testid="new-bike-input"
             className="flex-1 bg-transparent border-b border-line-strong focus:border-accent text-sm py-2 focus:outline-none"
           />
+          <select
+            value={newType}
+            onChange={(e) => setNewType(e.target.value)}
+            data-testid="new-bike-type"
+            className="bg-surface border border-line px-3 py-2 text-sm focus:outline-none focus:border-accent sm:w-44"
+          >
+            <option value="">Type (optional)…</option>
+            {BIKE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
           <button
             onClick={handleAdd}
             disabled={busy || !newBike.trim()}
             data-testid="add-bike-btn"
-            className="inline-flex items-center gap-2 bg-accent text-black font-bold uppercase tracking-[0.2em] text-xs px-4 py-2 disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 bg-accent text-black font-bold uppercase tracking-[0.2em] text-xs px-4 py-2 disabled:opacity-40"
           >
             <Plus className="w-4 h-4" />
             Add
           </button>
+        </div>
+        <div className="text-[10px] tracking-[0.2em] uppercase text-muted mt-2">
+          Pick a type so uploads with a matching FIT sub-sport auto-assign here.
         </div>
       </div>
 
@@ -131,6 +153,11 @@ export default function Equipment() {
               busy={busy}
               onSetDefault={() => handleSetDefault(b.name)}
               onRename={(next) => handleRename(b.name, next)}
+              onSetType={async (t) => {
+                await updateBikeProfile(b.name, { type: t || null });
+                toast.success(t ? `Type set to ${t}` : "Type cleared");
+                await refresh();
+              }}
               onDelete={() => setPendingDelete(b)}
             />
           ))
@@ -179,7 +206,7 @@ export default function Equipment() {
   );
 }
 
-function BikeRow({ bike, busy, onSetDefault, onRename, onDelete }) {
+function BikeRow({ bike, busy, onSetDefault, onRename, onSetType, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(bike.name);
 
@@ -258,6 +285,19 @@ function BikeRow({ bike, busy, onSetDefault, onRename, onDelete }) {
                       Default
                     </span>
                   )}
+                  <select
+                    value={bike.type || ""}
+                    onChange={(e) => onSetType(e.target.value)}
+                    data-testid={`bike-type-${bike.name}`}
+                    className="bg-surface border border-line px-2 py-1 text-[11px] tracking-[0.15em] uppercase focus:outline-none focus:border-accent"
+                  >
+                    <option value="">No type</option>
+                    {BIKE_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     onClick={() => setEditing(true)}

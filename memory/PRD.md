@@ -46,6 +46,16 @@ Single cyclist who wants Strava-like segment analytics kept 100% locally on thei
 - Graceful fallback for Safari/Firefox: classic download / file picker
 - New files: `src/lib/fsbackup.js`; updated `src/lib/localdb.js` (meta helpers); rewritten `src/pages/Backup.jsx`
 
+### Feb 2026 — Bike type + sub-sport auto-matching, compact upload zones, alphabetical segments
+- Added a `type` field to bike profiles (Road / Gravel / Mountain / Cyclocross / Indoor / Commute / Touring / E-bike / Track / Other). Selectable when adding a bike, editable inline on each row of Equipment, and as a fifth tile on the BikeDetail top bar.
+- Upload pipeline (`uploadRide`) now resolves the bike by:
+  1. FIT-supplied bike_name → use it,
+  2. Else if activity has a `sub_sport`: default bike if its `type` matches, otherwise the first other registered bike whose `type` matches, otherwise leave blank,
+  3. Else (e.g. GPX with no sub_sport): user's default bike.
+- Alias table covers Garmin sub_sport variants like "Gravel Cycling", "Indoor Cycling", "Cyclocross", "E_bike_fitness".
+- `UploadZone` got a `compact` prop — Segments and Activities pages now render the drop-zone + counts in a single short row instead of a tall block.
+- `listSegments()` now sorts alphabetically (case-insensitive) so segments stay in a predictable order in every selection list.
+
 ### Feb 2026 — Local-first migration
 - Replaced FastAPI + MongoDB data layer with IndexedDB (via `idb`)
 - Ported GPX parser to browser DOMParser (`src/lib/parsers.js`)
@@ -61,7 +71,7 @@ Single cyclist who wants Strava-like segment analytics kept 100% locally on thei
 ## Backlog / Future
 ### P1
 - Highlight best effort per segment across ALL years (currently best-effort is per year)
-- Filter rides by date range / year
+- Filter rides by date range / year / sub-sport / bike
 
 ### P2
 - Export individual ride as GPX
