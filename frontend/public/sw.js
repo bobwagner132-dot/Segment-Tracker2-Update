@@ -3,7 +3,7 @@
 // - Network-first with cache fallback for app assets & fonts
 // Version bump = force refresh of cached assets.
 
-const APP_CACHE = "cst-app-v1";
+const APP_CACHE = "cst-app-v2";
 const TILE_CACHE = "cst-tiles-v1";
 
 const TILE_HOSTS = [
@@ -57,8 +57,16 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
 
-  // Skip analytics / third-party API calls we shouldn't cache
   const url = req.url;
+
+  // 0) Never touch our own API routes — auth cookies + JSON error bodies
+  //    must reach the SPA untouched.
+  try {
+    const u = new URL(url);
+    if (u.origin === self.location.origin && u.pathname.startsWith("/api/")) {
+      return;
+    }
+  } catch { /* fall through */ }
 
   // 1) Map tiles: cache-first (stale ok, tiles are immutable)
   if (isTileRequest(url)) {

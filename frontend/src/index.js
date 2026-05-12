@@ -24,4 +24,23 @@ if (
       .register(swUrl)
       .catch((err) => console.warn("Service worker registration failed:", err));
   });
+} else if (
+  "serviceWorker" in navigator &&
+  process.env.NODE_ENV !== "production"
+) {
+  // Dev / preview: actively clear any stale SW registered by an older build.
+  // Stale workers intercept /api/* fetches and break credentialed JSON
+  // responses (browsers refuse cross-read of consumed streams).
+  window.addEventListener("load", async () => {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) await r.unregister();
+      if (window.caches) {
+        const keys = await caches.keys();
+        for (const k of keys) await caches.delete(k);
+      }
+    } catch {
+      /* ignore */
+    }
+  });
 }

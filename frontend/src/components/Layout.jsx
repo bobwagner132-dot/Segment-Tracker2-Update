@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Activity, Map, Route, Trophy, DatabaseBackup, LayoutDashboard, Settings, Bike, ShieldCheck } from "lucide-react";
+import { Activity, Map, Route, Trophy, DatabaseBackup, LayoutDashboard, Settings, Bike, ShieldCheck, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/lib/theme";
+import { useAuth } from "@/lib/auth";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
@@ -9,11 +10,14 @@ const NAV = [
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy, testid: "nav-leaderboards" },
   { to: "/equipment", label: "Equipment", icon: Bike, testid: "nav-equipment" },
   { to: "/backup", label: "Backup", icon: DatabaseBackup, testid: "nav-backup" },
-  { to: "/admin", label: "Admin", icon: ShieldCheck, testid: "nav-admin" },
+  { to: "/admin", label: "Admin", icon: ShieldCheck, testid: "nav-admin", adminOnly: true },
   { to: "/preferences", label: "Settings", icon: Settings, testid: "nav-preferences" },
 ];
 
 export default function Layout() {
+  const { user, logout } = useAuth();
+  const isAdmin = !!user?.is_admin;
+  const visibleNav = NAV.filter((n) => !n.adminOnly || isAdmin);
   return (
     <div className="min-h-screen bg-page text-main relative">
       <div className="fixed inset-0 pointer-events-none topo-bg z-0" aria-hidden />
@@ -34,7 +38,7 @@ export default function Layout() {
             </div>
           </div>
           <nav className="hidden md:flex items-center gap-1 ml-auto">
-            {NAV.map((n) => (
+            {visibleNav.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -52,12 +56,13 @@ export default function Layout() {
                 {n.label}
               </NavLink>
             ))}
-            <div className="ml-2">
+            <div className="ml-2 flex items-center gap-2 pl-2 border-l border-line">
               <ThemeToggle />
+              <UserMenu user={user} onLogout={logout} />
             </div>
           </nav>
           <div className="md:hidden ml-auto flex gap-1 overflow-x-auto items-center" data-testid="mobile-nav">
-            {NAV.map((n) => (
+            {visibleNav.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -73,6 +78,15 @@ export default function Layout() {
               </NavLink>
             ))}
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={logout}
+              aria-label="Sign out"
+              data-testid="m-logout"
+              className="p-2 border border-line text-secondary"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </header>
@@ -85,6 +99,30 @@ export default function Layout() {
           <span>All timings in local timezone</span>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function UserMenu({ user, onLogout }) {
+  if (!user) return null;
+  return (
+    <div className="flex items-center gap-2" data-testid="user-menu">
+      <div className="hidden lg:flex flex-col items-end leading-tight">
+        <div className="text-[10px] tracking-[0.25em] uppercase text-muted">
+          {user.is_admin ? "Admin" : "User"}
+        </div>
+        <div className="text-xs text-main truncate max-w-[160px]">{user.email}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onLogout}
+        aria-label="Sign out"
+        title="Sign out"
+        data-testid="logout-btn"
+        className="p-2 border border-line hover:border-accent text-secondary hover:text-accent transition-colors"
+      >
+        <LogOut className="w-4 h-4" strokeWidth={1.8} />
+      </button>
     </div>
   );
 }

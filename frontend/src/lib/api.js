@@ -19,18 +19,37 @@ class ApiError extends Error {
 }
 
 async function _parseError(res) {
-  let detail = `${res.status} ${res.statusText}`;
+  const friendlyByStatus = {
+    400: "Bad request.",
+    401: "Invalid email or password.",
+    403: "You don't have permission for that.",
+    404: "Not found.",
+    409: "Conflict — that record already exists.",
+    422: "Some fields are invalid.",
+    423: "Account is temporarily locked due to repeated failures.",
+    500: "Server error — try again in a moment.",
+  };
+  let detail = friendlyByStatus[res.status] || (res.statusText && res.statusText.trim()) || `HTTP ${res.status}`;
   try {
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) {
-      const j = await res.json();
-      detail = j.detail || j.message || JSON.stringify(j);
-    } else {
-      const t = await res.text();
-      if (t) detail = t;
+    // Read body ONCE as text, then try to parse as JSON. Doing it this way
+    // means a botched JSON body (or a service-worker-intercepted stream) won't
+    // leave us with an empty error message.
+    const text = await res.text();
+    if (text) {
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        try {
+          const j = JSON.parse(text);
+          detail = j.detail || j.message || j.error || detail;
+        } catch {
+          detail = text;
+        }
+      } else {
+        detail = text;
+      }
     }
   } catch {
-    /* ignore */
+    /* swallow — keep the status-mapped fallback */
   }
   return new ApiError(detail, res.status);
 }
@@ -42,7 +61,11 @@ async function _request(method, path, { body, headers, query } = {}) {
       if (v !== undefined && v !== null) url.searchParams.set(k, v);
     }
   }
-  const init = { method, headers: { ...(headers || {}) } };
+  const init = {
+    method,
+    credentials: "include",
+    headers: { ...(headers || {}) },
+  };
   if (body !== undefined) {
     if (body instanceof FormData) {
       init.body = body;
@@ -69,6 +92,53 @@ async function _uploadFile(path, file) {
   const fd = new FormData();
   fd.append("file", file, file.name);
   return _request("POST", path, { body: fd });
+}
+
+// ---------- Error formatting ----------
+export function formatApiError(err) {
+  if (!err) return "Something went wrong.";
+  const d = err.response?.data?.detail ?? err.message;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d))
+    return d
+      .map((e) => (e && typeof e.msg === "string" ? e.msg : JSON.stringify(e)))
+      .join(" · ");
+  if (d && typeof d.msg === "string") return d.msg;
+  return String(d);
+}
+
+// ---------- Auth ----------
+export async function authStatus() {
+  return apiGet("/auth/status");
+}
+export async function login(email, password) {
+  return apiPost("/auth/login", { email, password });
+}
+export async function logout() {
+  return apiPost("/auth/logout");
+}
+export async function setInitialPassword(email, password) {
+  return apiPost("/auth/set-initial-password", { email, password });
+}
+export async function fetchMe() {
+  return apiGet("/auth/me");
+}
+
+// ---------- Admin user management ----------
+export async function adminListUsers() {
+  return apiGet("/admin/users");
+}
+export async function adminCreateUser(email, password, isAdmin = false) {
+  return apiPost("/admin/users", { email, password, is_admin: isAdmin });
+}
+export async function adminDeleteUser(userId) {
+  return apiDelete(`/admin/users/${userId}`);
+}
+export async function adminResetPassword(userId, password) {
+  return apiPost(`/admin/users/${userId}/reset-password`, { password });
+}
+export async function adminSetAdmin(userId, isAdmin) {
+  return apiPost(`/admin/users/${userId}/admin`, { is_admin: isAdmin });
 }
 
 // ---------- Segments ----------

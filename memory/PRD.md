@@ -87,10 +87,27 @@ A personal cycling analysis web app. Define segments (GPX), upload rides (GPX/FI
 - `scripts/install-launchd.sh` / `uninstall-launchd.sh` — registers a `LaunchAgent` plist (`com.local.cyclingtracker`) with `KeepAlive` so the service auto-starts at login and self-recovers.
 - `docs/DEPLOYMENT-macOS-10.15.md` — full step-by-step guide covering Homebrew, Python 3.11, iCloud `.nosync` rationale, LAN access (`CST_HOST=0.0.0.0`), backups, migration, troubleshooting.
 
-## Pass 4 (future) — Auth activation
-- Will call `integration_playbook_expert_v2` first.
-- Bcrypt + JWT in HttpOnly cookie, login screen, account-lockout.
-- Schema already has `users` table + `user_id` columns; purely additive change.
+## Pass 4 (May 2026) — Auth activation (DONE)
+- **bcrypt + JWT-in-HttpOnly-cookie** auth. Access token 15 min, refresh 7 days. Implementation follows the verified `integration_playbook_expert_v2` pattern (cookie-first, Authorization-header fallback, SameSite=Lax, Secure flag auto-detected from `x-forwarded-proto`/scheme).
+- Endpoints in `cst/auth_routes.py`:
+  - `GET /api/auth/status` (open) — drives the SPA's gate.
+  - `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`.
+  - `POST /api/auth/set-initial-password` — first-run-only.
+  - Admin user CRUD under `/api/admin/users` (+ `/admin/users/{id}/reset-password` and `/admin/users/{id}/admin`).
+- `current_user_id` dependency rewritten in `cst/auth.py` to decode the cookie/header JWT. All existing routes pick this up automatically.
+- Schema migration: `users` table now has `last_login_at`, `failed_attempts`, `locked_until`. Idempotent `ALTER TABLE` runs in `init_db()` to upgrade existing DBs.
+- **Brute-force**: 5 failed attempts on an email → 15-minute account lockout (returns HTTP 423).
+- **Admin-invites-only**: open signup endpoint deliberately omitted. The only way to add users after first-run is from the Admin → Users panel.
+- **Dev container seed**: `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars in `backend/.env` auto-seed the default user on first boot (Mac install leaves these blank → first-run wizard shows). Credentials documented in `/app/memory/test_credentials.md`.
+- **Frontend**:
+  - `lib/auth.jsx` — AuthProvider + useAuth() exposing `state` (`loading` | `needs_setup` | `logged_out` | `logged_in`), `user`, `login`, `logout`, `completeSetup`.
+  - `pages/LoginPage.jsx` — branded login card + first-run setup wizard, picks itself based on auth state.
+  - `App.js` wraps the router in `<AuthProvider>` and gates every route via `<Gate>`. Pre-login, only LoginPage renders.
+  - `Layout.jsx` shows the logged-in user email + admin badge + logout button in the header.
+  - Admin nav item visible only when `user.is_admin`.
+  - Admin → Users section with invite form, role toggle, password reset, delete.
+- CORS upgraded from `allow_origins=["*"]` to `allow_origin_regex=".*"` so cookies survive (browsers reject `*` + credentials).
+- pytest smoke suite expanded (`backend/tests/test_smoke.py`): 9/9 green covering health, auth flow, lockout-adjacent paths, segment+ride+effort with auth, admin user CRUD, backup roundtrip.
 
 ## Backlog / Future
 - Highlight best effort per segment across ALL years on Leaderboards.

@@ -62,11 +62,14 @@ def get_conn():
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT,
-    is_admin      INTEGER NOT NULL DEFAULT 0,
-    created_at    TEXT NOT NULL
+    id              INTEGER PRIMARY KEY,
+    email           TEXT NOT NULL UNIQUE,
+    password_hash   TEXT,
+    is_admin        INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL,
+    last_login_at   TEXT,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS segments (
@@ -181,6 +184,15 @@ def init_db() -> None:
         c.execute("PRAGMA journal_mode = WAL")
         c.execute("PRAGMA synchronous = NORMAL")
         c.executescript(SCHEMA)
+        # Forward-migrate older databases that pre-date the auth columns.
+        existing_cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
+        for col, ddl in (
+            ("last_login_at", "ALTER TABLE users ADD COLUMN last_login_at TEXT"),
+            ("failed_attempts", "ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0"),
+            ("locked_until", "ALTER TABLE users ADD COLUMN locked_until TEXT"),
+        ):
+            if col not in existing_cols:
+                c.execute(ddl)
         existing = c.execute(
             "SELECT 1 FROM users WHERE id = ?", (DEFAULT_USER_ID,)
         ).fetchone()

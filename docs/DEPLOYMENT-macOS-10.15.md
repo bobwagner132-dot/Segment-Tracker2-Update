@@ -155,6 +155,41 @@ bash scripts/uninstall-launchd.sh
 
 ---
 
+## 5a · First-run account setup
+
+The **first time** you open the app in any browser, the SPA shows a one-time **Create your admin account** screen. Enter the email + password you want; they're bcrypt-hashed and stored locally. All existing rides, segments and bikes (if you migrated from the IndexedDB build) become owned by that account automatically.
+
+After that, every visit goes straight to a regular **Sign in** screen.
+
+> The dev container ships with pre-seeded test credentials in `backend/.env` (`ADMIN_EMAIL` / `ADMIN_PASSWORD`). On the Mac install those vars aren't set, so the first-run wizard is what you see.
+
+### Add more accounts later
+
+Sign in as the admin → **Admin → Users → + Invite user** → set their email + password (and tick **Admin** if they should be able to manage other users). The new account can then sign in from any device on the LAN.
+
+### Forgot a password?
+
+As admin, **Admin → Users → Reset password** for any account (including your own — useful if you locked yourself out and have another admin signed in).
+
+If you lock the *only* admin out, drop to Terminal:
+
+```bash
+python3 -c "
+import sqlite3
+db = '~/Documents/CyclingTracker/data.nosync/database.sqlite'
+import os; db = os.path.expanduser(db)
+c = sqlite3.connect(db)
+c.execute('UPDATE users SET password_hash = NULL WHERE id = 1')
+c.commit(); c.close()
+print('Done. Reload the app — first-run wizard will reappear.')"
+```
+
+### Security note
+
+5 failed login attempts on any account triggers a **15-minute lockout** on that account. The lockout is per-email, not per-IP, so it doesn't accidentally lock out other users on the same LAN.
+
+---
+
 ## 6 · Accessing the app from your phone / iPad / another Mac
 
 By default the server binds to `127.0.0.1` and is only reachable from the same Mac. To open it to your home Wi-Fi:

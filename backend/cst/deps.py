@@ -1,6 +1,6 @@
 """Helpers shared by route handlers.
 
-* Auth dependency (Pass 1 always returns user_id=1).
+* Auth dependency now backed by `cst.auth` (JWT cookies, admin gate).
 * Bike-type ↔ FIT sub_sport matching ported from the JS implementation.
 * Reverse-geocoding via OpenStreetMap Nominatim.
 """
@@ -14,14 +14,7 @@ from typing import Iterable, Optional
 import httpx
 from fastapi import Depends, Request
 
-from .db import DEFAULT_USER_ID
-
-
-# ---------- Auth (Pass 1: hard-wired single user) ----------
-async def current_user_id(request: Request) -> int:
-    # Pass 2 will read a JWT from the `cst_session` cookie or Authorization
-    # header. For now everything maps to the default user.
-    return DEFAULT_USER_ID
+from .auth import current_admin_id, current_user_id  # re-exported for routes
 
 
 # ---------- Bike-type aliases (Garmin sub_sport variants) ----------

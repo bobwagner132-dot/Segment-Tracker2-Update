@@ -21,7 +21,14 @@ import {
   listAdminBackups,
   deleteOrphanUploads,
   backupZipUrl,
+  adminListUsers,
+  adminCreateUser,
+  adminDeleteUser,
+  adminResetPassword,
+  adminSetAdmin,
+  formatApiError,
 } from "../lib/api";
+import { useAuth } from "../lib/auth";
 
 // Local helpers — admin endpoints not on the main client surface
 const BASE = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -29,6 +36,7 @@ const BASE = `${process.env.REACT_APP_BACKEND_URL}/api`;
 async function _json(method, path, body) {
   const res = await fetch(BASE + path, {
     method,
+    credentials: "include",
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -329,6 +337,9 @@ export default function Admin() {
         )}
       </section>
 
+      {/* Users (multi-user account management) */}
+      <UsersSection />
+
       {/* Orphans */}
       <section
         className="border border-dashed border-line-strong bg-subtle p-5 flex flex-wrap items-center gap-3"
@@ -372,6 +383,237 @@ export default function Admin() {
         onCancel={() => setConfirmOrphans(false)}
       />
     </div>
+  );
+}
+
+function UsersSection() {
+  const { user: me } = useAuth();
+  const [users, setUsers] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [makeAdmin, setMakeAdmin] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function refresh() {
+    try {
+      setUsers(await adminListUsers());
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function createUser(e) {
+    e.preventDefault();
+    setErr("");
+    if (password.length < 8) {
+      setErr("Password must be at least 8 characters.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await adminCreateUser(email.trim(), password, makeAdmin);
+      toast.success(`Created ${email}`);
+      setEmail("");
+      setPassword("");
+      setMakeAdmin(false);
+      setShowForm(false);
+      await refresh();
+    } catch (e) {
+      setErr(formatApiError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetPw(u) {
+    const next = window.prompt(`New password for ${u.email}:`);
+    if (!next) return;
+    if (next.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    try {
+      await adminResetPassword(u.id, next);
+      toast.success(`Password reset for ${u.email}`);
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  }
+
+  async function toggleAdmin(u) {
+    try {
+      await adminSetAdmin(u.id, !u.is_admin);
+      await refresh();
+      toast.success(u.is_admin ? "Demoted to user" : "Promoted to admin");
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  }
+
+  async function removeUser(u) {
+    if (!window.confirm(`Delete ${u.email}? Their rides, segments and bikes will be removed too.`))
+      return;
+    try {
+      await adminDeleteUser(u.id);
+      toast.success(`Deleted ${u.email}`);
+      await refresh();
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  }
+
+  return (
+    <section className="border border-line bg-surface" data-testid="admin-users">
+      <header className="px-5 py-3 border-b border-line-subtle flex items-center gap-3">
+        <ShieldCheckIcon />
+        <div className="font-display font-bold uppercase tracking-tight">Users</div>
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            data-testid="admin-add-user-toggle"
+            className="text-[11px] uppercase tracking-[0.25em] text-accent hover:opacity-80"
+          >
+            {showForm ? "Cancel" : "+ Invite user"}
+          </button>
+        </div>
+      </header>
+      {showForm && (
+        <form
+          onSubmit={createUser}
+          className="p-5 border-b border-line-subtle grid grid-cols-1 md:grid-cols-4 gap-3 items-end"
+          data-testid="admin-add-user-form"
+        >
+          <label className="block">
+            <div className="text-[10px] tracking-[0.3em] uppercase text-muted mb-1">Email</div>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              data-testid="admin-new-user-email"
+              className="w-full bg-transparent border-b border-line-strong focus:border-accent text-sm py-1 focus:outline-none"
+            />
+          </label>
+          <label className="block">
+            <div className="text-[10px] tracking-[0.3em] uppercase text-muted mb-1">Password (≥ 8)</div>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              data-testid="admin-new-user-password"
+              className="w-full bg-transparent border-b border-line-strong focus:border-accent text-sm py-1 focus:outline-none"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={makeAdmin}
+              onChange={(e) => setMakeAdmin(e.target.checked)}
+              data-testid="admin-new-user-isadmin"
+              className="accent-cyan-400"
+            />
+            Admin
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            data-testid="admin-create-user-submit"
+            className="bg-accent text-black font-bold uppercase tracking-[0.2em] text-[11px] py-2 disabled:opacity-50"
+          >
+            {busy ? "Creating…" : "Create user"}
+          </button>
+          {err && (
+            <div
+              className="md:col-span-4 text-xs text-danger"
+              data-testid="admin-create-user-error"
+            >
+              {err}
+            </div>
+          )}
+        </form>
+      )}
+      <div className="divide-y divide-line-subtle">
+        {users.map((u) => (
+          <div
+            key={u.id}
+            className="px-5 py-3 flex items-center gap-4 flex-wrap"
+            data-testid={`admin-user-row-${u.id}`}
+          >
+            <div className="font-num text-sm flex-1 truncate">{u.email}</div>
+            {u.is_admin && (
+              <span className="text-[9px] tracking-[0.3em] uppercase bg-accent text-black px-2 py-0.5 font-bold">
+                Admin
+              </span>
+            )}
+            {!u.has_password && (
+              <span className="text-[9px] tracking-[0.3em] uppercase text-danger border border-danger/40 px-2 py-0.5">
+                No password
+              </span>
+            )}
+            {u.last_login_at && (
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted hidden md:block">
+                last login · {new Date(u.last_login_at).toLocaleDateString()}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => resetPw(u)}
+              data-testid={`admin-reset-${u.id}`}
+              className="text-[10px] uppercase tracking-[0.25em] text-secondary hover:text-accent"
+            >
+              Reset password
+            </button>
+            {me?.id !== u.id && (
+              <button
+                type="button"
+                onClick={() => toggleAdmin(u)}
+                data-testid={`admin-toggle-${u.id}`}
+                className="text-[10px] uppercase tracking-[0.25em] text-secondary hover:text-accent"
+              >
+                {u.is_admin ? "Demote" : "Promote"}
+              </button>
+            )}
+            {me?.id !== u.id && (
+              <button
+                type="button"
+                onClick={() => removeUser(u)}
+                data-testid={`admin-delete-${u.id}`}
+                className="text-[10px] uppercase tracking-[0.25em] text-danger hover:opacity-80"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ShieldCheckIcon() {
+  // Inline so we don't pull a second lucide import; the page already uses it.
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="text-accent"
+    >
+      <path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
   );
 }
 

@@ -17,14 +17,19 @@ from fastapi.staticfiles import StaticFiles
 
 from cst.db import init_db
 from cst.routes import router
+from cst.auth_routes import router as auth_router, admin_router as admin_user_router
+from cst import auth as auth_module
 from cst import scheduler as backup_scheduler
 
 app = FastAPI(title="Cycling Segment Tracker 2")
 
-# Open CORS for local-first usage. Tightened up in Pass 2 when auth ships.
+# Browsers reject `allow_origins=["*"]` together with `allow_credentials=True`.
+# Reflect the request origin instead so cookies work cross-origin in dev (where
+# the Emergent ingress maps webpack-dev-server and FastAPI behind the same URL)
+# and same-origin in the Mac install.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,6 +39,7 @@ app.add_middleware(
 @app.on_event("startup")
 def _startup():
     init_db()
+    auth_module.maybe_seed_admin_from_env()
     backup_scheduler.start(app)
 
 
@@ -43,6 +49,8 @@ def _shutdown():
 
 
 # /api/* routes must be registered BEFORE the SPA catch-all below.
+app.include_router(auth_router)
+app.include_router(admin_user_router)
 app.include_router(router)
 
 

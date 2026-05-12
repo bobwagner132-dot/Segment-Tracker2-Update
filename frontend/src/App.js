@@ -11,7 +11,9 @@ import Preferences from "@/pages/Preferences";
 import Equipment from "@/pages/Equipment";
 import BikeDetail from "@/pages/BikeDetail";
 import Admin from "@/pages/Admin";
+import LoginPage from "@/pages/LoginPage";
 import { ThemeProvider, useTheme } from "@/lib/theme";
+import { AuthProvider, useAuth } from "@/lib/auth";
 
 function ThemedToaster() {
   const { theme } = useTheme();
@@ -33,24 +35,34 @@ function App() {
   return (
     <div className="App">
       <ThemeProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/segments" element={<Segments />} />
-              <Route path="/rides" element={<Rides />} />
-              <Route path="/leaderboards" element={<Leaderboards />} />
-              <Route path="/equipment" element={<Equipment />} />
-              <Route path="/equipment/:name" element={<BikeDetail />} />
-              <Route path="/backup" element={<Backup />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/preferences" element={<Preferences />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-        <ThemedToaster />
+        <AuthProvider>
+          <BrowserRouter>
+            <Gate />
+          </BrowserRouter>
+          <ThemedToaster />
+        </AuthProvider>
       </ThemeProvider>
     </div>
+  );
+}
+
+function Gate() {
+  const { state } = useAuth();
+  if (state !== "logged_in") return <LoginPage />;
+  return (
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/segments" element={<Segments />} />
+        <Route path="/rides" element={<Rides />} />
+        <Route path="/leaderboards" element={<Leaderboards />} />
+        <Route path="/equipment" element={<Equipment />} />
+        <Route path="/equipment/:name" element={<BikeDetail />} />
+        <Route path="/backup" element={<Backup />} />
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/preferences" element={<Preferences />} />
+      </Route>
+    </Routes>
   );
 }
 
