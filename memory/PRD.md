@@ -109,14 +109,23 @@ A personal cycling analysis web app. Define segments (GPX), upload rides (GPX/FI
 - CORS upgraded from `allow_origins=["*"]` to `allow_origin_regex=".*"` so cookies survive (browsers reject `*` + credentials).
 - pytest smoke suite expanded (`backend/tests/test_smoke.py`): 9/9 green covering health, auth flow, lockout-adjacent paths, segment+ride+effort with auth, admin user CRUD, backup roundtrip.
 
+## Pass 5 (May 2026) — Preview iframe login fix + Best-Effort highlighting (DONE)
+- **Fix: login on Emergent Preview** — auth cookies are now `SameSite=None; Secure` when served over HTTPS (the preview is loaded inside an iframe at `app.emergent.sh`, so cookies must be cross-site-eligible). `SameSite=Lax + Secure=off` is kept for plain-HTTP Mac install. See `cst/auth._cookie_kwargs()`.
+- `clear_auth_cookies` issues both a `None+Secure` delete and a `Lax+insecure` overwrite so logout works in both environments.
+- `lib/api.js::_parseError` no longer mis-maps any 401 to "Invalid email or password" — that message is now scoped to the `/auth/login` path, every other 401 reads "Your session expired. Please sign in again."
+- **Best-effort highlighting** — `GET /api/segments` and `/api/segments/{id}` now include `best_effort` (PR row: `effort_id, ride_id, ride_name, elapsed_s, datetime_utc, avg_power, avg_hr`) and `effort_count`. PR is computed as the row with `MIN(e.elapsed_s)` joined with the ride name.
+- `pages/Segments.jsx` shows a PR badge per row (`crown + elapsed + Nx attempts`) and a hero **PR card** above the elevation chart on the detail panel (clicking the ride name jumps to the matching Activity). When no efforts exist yet, both render gracefully as "No efforts yet".
+- Regression tests: new `backend/tests/test_auth_and_pr.py` (7/7 green) — covers cookie attributes, cookie persistence across `/me /rides /segments /stats`, 401 message wording, logout, PR shape, PR populated after a ride upload, and MIN(elapsed_s) tie-break.
+
 ## Backlog / Future
-- Highlight best effort per segment across ALL years on Leaderboards.
-- Filter Activities by date range / year / sub-sport / bike.
+- ⚠️ Legacy `backend/tests/backend_test.py` (27 tests) hasn't been migrated to a logged-in session — they assert 200 on auth-protected routes and now fail with 401. Action: add a shared `_login_session()` fixture (pattern in `test_auth_and_pr.py`) and update each test to login first.
+- Filter / search Activities by date range / year / sub-sport / bike (P2).
+- First-launch welcome overlay explaining data folder + backup configuration (P2, suggested).
 - Year-over-year overlay on cumulative dashboard charts.
 - Export individual ride as GPX.
 
 ## Files of reference
-- `/app/backend/cst/db.py`, `routes.py`, `detector.py`, `parsers.py`, `deps.py`
+- `/app/backend/cst/db.py`, `routes.py`, `detector.py`, `parsers.py`, `deps.py`, `auth.py`, `auth_routes.py`
 - `/app/backend/server.py`
-- `/app/frontend/src/lib/api.js`, `migrate.js`
-- `/app/frontend/src/pages/Preferences.jsx` (migration section)
+- `/app/frontend/src/lib/api.js`, `migrate.js`, `auth.jsx`
+- `/app/frontend/src/pages/Preferences.jsx` (migration section), `Segments.jsx`, `LoginPage.jsx`
