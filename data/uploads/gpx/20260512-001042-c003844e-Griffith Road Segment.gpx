@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx creator="StravaGPX" version="1.1" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+ <metadata>
+  <name>Griffith Road Segment</name>
+  <author>
+   <name>Bob Wagner</name>
+   <link href="https://www.strava.com/athletes/197683"/>
+  </author>
+  <copyright author="OpenStreetMap contributors">
+   <year>2020</year>
+   <license>https://www.openstreetmap.org/copyright</license>
+  </copyright>
+  <link href="https://www.strava.com/routes/3486711787507648750"/>
+ </metadata>
+ <trk>
+  <name>Griffith Road Segment</name>
+  <link href="https://www.strava.com/routes/3486711787507648750"/>
+  <type>cycling</type>
+  <trkseg>
+   <trkpt lat="-27.558280000000003" lon="153.05121000000003">
+    <ele>48.49</ele>
+   </trkpt>
+   <trkpt lat="-27.558015000884016" lon="153.0517050011817">
+    <ele>52.64000000000001</ele>
+   </trkpt>
+   <trkpt lat="-27.557750000000002" lon="153.0522">
+    <ele>58.64</ele>
+   </trkpt>
+   <trkpt lat="-27.557660000000002" lon="153.05236000000002">
+    <ele>58.64</ele>
+   </trkpt>
+   <trkpt lat="-27.557450000000003" lon="153.05259">
+    <ele>61.06</ele>
+   </trkpt>
+   <trkpt lat="-27.557190000000002" lon="153.05272000000002">
+    <ele>63.02</ele>
+   </trkpt>
+   <trkpt lat="-27.556990000000003" lon="153.05278">
+    <ele>65.14999999999999</ele>
+   </trkpt>
+   <trkpt lat="-27.556900000000002" lon="153.05279000000002">
+    <ele>66.12</ele>
+   </trkpt>
+   <trkpt lat="-27.556630000000002" lon="153.05274">
+    <ele>67.46000000000001</ele>
+   </trkpt>
+   <trkpt lat="-27.55664" lon="153.05275">
+    <ele>67.46000000000001</ele>
+   </trkpt>
+   <trkpt lat="-27.556350000000002" lon="153.05264000000003">
+    <ele>70.43</ele>
+   </trkpt>
+   <trkpt lat="-27.556140000000003" lon="153.05247">
+    <ele>70.43</ele>
+   </trkpt>
+   <trkpt lat="-27.55591" lon="153.05221">
+    <ele>72.14000000000001</ele>
+   </trkpt>
+   <trkpt lat="-27.555610000949688" lon="153.0516799984536">
+    <ele>75.50000000000001</ele>
+   </trkpt>
+   <trkpt lat="-27.555310000000002" lon="153.05115">
+    <ele>80.17</ele>
+   </trkpt>
+   <trkpt lat="-27.555120000000002" lon="153.05094000000003">
+    <ele>81.2</ele>
+   </trkpt>
+   <trkpt lat="-27.555130000000002" lon="153.05095">
+    <ele>81.2</ele>
+   </trkpt>
+   <trkpt lat="-27.554375000873776" lon="153.05044999654837">
+    <ele>82.95</ele>
+   </trkpt>
+   <trkpt lat="-27.553620000000002" lon="153.04995000000002">
+    <ele>86.23</ele>
+   </trkpt>
+   <trkpt lat="-27.553410000000003" lon="153.04983000000001">
+    <ele>89.39000000000001</ele>
+   </trkpt>
+   <trkpt lat="-27.553150000000002" lon="153.04976000000002">
+    <ele>89.39000000000001</ele>
+   </trkpt>
+   <trkpt lat="-27.552930000000003" lon="153.04975000000002">
+    <ele>92.67</ele>
+   </trkpt>
+   <trkpt lat="-27.552690000000002" lon="153.0498">
+    <ele>94.56</ele>
+   </trkpt>
+   <trkpt lat="-27.55252" lon="153.04991">
+    <ele>96.28</ele>
+   </trkpt>
+  </trkseg>
+ </trk>
+</gpx>

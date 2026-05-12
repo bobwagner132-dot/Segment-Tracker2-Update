@@ -32,6 +32,7 @@ from .detector import (
     hash_ride_points, hash_segment_points, total_distance_m,
 )
 from .parsers import parse_fit, parse_gpx
+from . import scheduler as backup_scheduler
 
 router = APIRouter(prefix="/api")
 
@@ -945,8 +946,8 @@ def yearly_stats(year: Optional[int] = None, uid: int = Depends(current_user_id)
     target = year or (years[0] if years else datetime.now().year)
 
     month_labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-    months = [{"month": i, "label": l, "distance_km": 0, "elevation_m": 0, "ride_count": 0}
-              for i, l in enumerate(month_labels)]
+    months = [{"month": i, "label": lbl, "distance_km": 0, "elevation_m": 0, "ride_count": 0}
+              for i, lbl in enumerate(month_labels)]
     in_year = []
     for r in rides:
         t = r["start_time"] or r["created_at"]
@@ -1172,10 +1173,11 @@ def admin_storage(uid: int = Depends(current_user_id)):
 
 @router.get("/admin/backups")
 def list_backups(uid: int = Depends(current_user_id)):
-    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+    target = Path(backup_scheduler.get_settings()["target_dir"])
+    target.mkdir(parents=True, exist_ok=True)
     items = []
-    for f in sorted(BACKUPS_DIR.iterdir(), reverse=True):
-        if f.is_file():
+    for f in sorted(target.iterdir(), reverse=True):
+        if f.is_file() and f.name.endswith(".zip"):
             items.append({
                 "name": f.name,
                 "bytes": f.stat().st_size,
@@ -1204,6 +1206,62 @@ def delete_orphan_uploads(uid: int = Depends(current_user_id)):
                 except Exception:
                     pass
     return {"removed": removed}
+
+
+# ============================ BACKUP SCHEDULER ============================
+@router.get("/admin/scheduler")
+def scheduler_status(uid: int = Depends(current_user_id)):
+    return backup_scheduler.status()
+
+
+class SchedulerSettings(BaseModel):
+    interval_hours: Optional[int] = None
+    include_uploads: Optional[bool] = None
+    retention_count: Optional[int] = None
+    target_dir: Optional[str] = None
+    model_config = {"extra": "ignore"}
+
+
+@router.patch("/admin/scheduler")
+def update_scheduler(body: Dict[str, Any], uid: int = Depends(current_user_id)):
+    patch: Dict[str, Any] = {}
+    for k in ("interval_hours", "include_uploads", "retention_count", "target_dir"):
+        if k in body:
+            patch[k] = body[k]
+    backup_scheduler.save_settings(patch)
+    return backup_scheduler.status()
+
+
+@router.post("/admin/backup-now")
+def backup_now(body: Dict[str, Any] = None, uid: int = Depends(current_user_id)):
+    body = body or {}
+    return backup_scheduler.run_backup(
+        include_uploads=body.get("include_uploads"),
+        target_dir=body.get("target_dir"),
+    )
+
+
+@router.post("/admin/restore-from-server-backup")
+def restore_from_server_backup(body: Dict[str, Any], uid: int = Depends(current_user_id)):
+    """Restore from one of the files in the configured backup folder."""
+    name = (body or {}).get("name", "")
+    if not name or "/" in name or "\\" in name or name.startswith("."):
+        raise HTTPException(400, "Invalid backup name")
+    target_dir = Path(backup_scheduler.get_settings()["target_dir"])
+    path = target_dir / name
+    if not path.exists() or not path.is_file():
+        raise HTTPException(404, "Backup not found")
+    return backup_scheduler.restore_zip(path)
+
+
+@router.post("/admin/restore-zip-upload")
+async def restore_zip_upload(file: UploadFile = File(...), uid: int = Depends(current_user_id)):
+    """Restore by uploading a ZIP from the browser."""
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+    target = BACKUPS_DIR / f"uploaded-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{file.filename}"
+    raw = await file.read()
+    target.write_bytes(raw)
+    return backup_scheduler.restore_zip(target)
 
 
 @router.get("/health")

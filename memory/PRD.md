@@ -74,18 +74,23 @@ A personal cycling analysis web app. Define segments (GPX), upload rides (GPX/FI
 - `curl POST /api/rides` (same GPX) → ride row, effort row, default bike auto-assigned, original file kept.
 - Dashboard, Activities, Equipment, Settings all render with no console errors, charts populate, bike default + type round-trip persists.
 
-## Pass 2 (next) — Backups + Admin
-- `node-cron`-style scheduled backups (using APScheduler or a simple background thread).
-- Admin tab in the UI: storage usage gauges, "Backup now" button, restore-from-ZIP, orphan-uploads sweeper.
-- Configurable backup target folder (default `~/Documents/CyclingTracker/backups/`).
-- Activate real auth (call integration playbook for bcrypt+JWT pattern before writing).
+## Pass 2 (May 2026) — Backups + Admin (DONE)
+- Background scheduler (APScheduler) runs configurable interval backups; default every 24 h, keep newest 14.
+- ZIP backup uses SQLite's online backup API (crash-safe) and bundles uploads when enabled.
+- New Admin tab with: storage usage tiles, schedule editor (interval / retention / include-uploads / target folder), Backup-now, Download-as-ZIP, Restore-from-server-backup, Restore-from-uploaded-ZIP, Orphan-uploads sweeper, backup list with per-row Restore.
+- Schedule settings persist to `meta` table per user.
+- `pytest` smoke suite at `backend/tests/test_smoke.py` (health, segment+ride effort detection, bike add/default, backup roundtrip — all green).
 
-## Pass 3 — Mac packaging
-- `scripts/start-mac.sh` (uvicorn + open browser).
-- `scripts/install-launchd.sh` (auto-start on login).
-- Pre-build frontend to `backend/static/`, serve it from the same FastAPI process.
-- LAN-bind flag for phone/tablet access on home Wi-Fi.
-- `docs/DEPLOYMENT-macOS-10.15.md` with Python 3.11 + venv + folder layout + auto-start + iCloud notes.
+## Pass 3 (May 2026) — Mac packaging (DONE)
+- `backend/server.py` now serves the React production bundle from `frontend/build/` as a SPA when present (single-process Mac deployment); falls back to JSON root in dev container.
+- `scripts/start-mac.sh` — idempotent launcher: creates venv, installs deps if requirements changed, builds frontend on first run, sets CST_DATA_DIR to `~/Documents/CyclingTracker/data.nosync`, launches uvicorn, opens browser.
+- `scripts/install-launchd.sh` / `uninstall-launchd.sh` — registers a `LaunchAgent` plist (`com.local.cyclingtracker`) with `KeepAlive` so the service auto-starts at login and self-recovers.
+- `docs/DEPLOYMENT-macOS-10.15.md` — full step-by-step guide covering Homebrew, Python 3.11, iCloud `.nosync` rationale, LAN access (`CST_HOST=0.0.0.0`), backups, migration, troubleshooting.
+
+## Pass 4 (future) — Auth activation
+- Will call `integration_playbook_expert_v2` first.
+- Bcrypt + JWT in HttpOnly cookie, login screen, account-lockout.
+- Schema already has `users` table + `user_id` columns; purely additive change.
 
 ## Backlog / Future
 - Highlight best effort per segment across ALL years on Leaderboards.

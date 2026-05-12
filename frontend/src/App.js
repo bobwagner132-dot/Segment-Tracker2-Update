@@ -10,6 +10,7 @@ import Backup from "@/pages/Backup";
 import Preferences from "@/pages/Preferences";
 import Equipment from "@/pages/Equipment";
 import BikeDetail from "@/pages/BikeDetail";
+import Admin from "@/pages/Admin";
 import { ThemeProvider, useTheme } from "@/lib/theme";
 
 function ThemedToaster() {
@@ -42,6 +43,7 @@ function App() {
               <Route path="/equipment" element={<Equipment />} />
               <Route path="/equipment/:name" element={<BikeDetail />} />
               <Route path="/backup" element={<Backup />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/preferences" element={<Preferences />} />
             </Route>
           </Routes>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx creator="StravaGPX" version="1.1" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+ <metadata>
+  <name>Homestead St Segment</name>
+  <author>
+   <name>Bob Wagner</name>
+   <link href="https://www.strava.com/athletes/197683"/>
+  </author>
+  <copyright author="OpenStreetMap contributors">
+   <year>2020</year>
+   <license>https://www.openstreetmap.org/copyright</license>
+  </copyright>
+  <link href="https://www.strava.com/routes/3486703574842342470"/>
+ </metadata>
+ <trk>
+  <name>Homestead St Segment</name>
+  <link href="https://www.strava.com/routes/3486703574842342470"/>
+  <type>cycling</type>
+  <trkseg>
+   <trkpt lat="-27.52943" lon="153.02704">
+    <ele>28.610000000000003</ele>
+   </trkpt>
+   <trkpt lat="-27.529490000000003" lon="153.02723">
+    <ele>28.740000000000002</ele>
+   </trkpt>
+   <trkpt lat="-27.529600001623212" lon="153.02790499928483">
+    <ele>32.89</ele>
+   </trkpt>
+   <trkpt lat="-27.52971" lon="153.02858">
+    <ele>35.660000000000004</ele>
+   </trkpt>
+   <trkpt lat="-27.5298" lon="153.02879000000001">
+    <ele>37.35</ele>
+   </trkpt>
+   <trkpt lat="-27.530130000000003" lon="153.02926000000002">
+    <ele>42.99</ele>
+   </trkpt>
+   <trkpt lat="-27.53037" lon="153.02958">
+    <ele>45.910000000000004</ele>
+   </trkpt>
+   <trkpt lat="-27.53039" lon="153.02966">
+    <ele>46.89</ele>
+   </trkpt>
+   <trkpt lat="-27.53047" lon="153.02980000000002">
+    <ele>47.5</ele>
+   </trkpt>
+   <trkpt lat="-27.53048" lon="153.02981000000003">
+    <ele>47.5</ele>
+   </trkpt>
+   <trkpt lat="-27.530490000000004" lon="153.02998000000002">
+    <ele>48.260000000000005</ele>
+   </trkpt>
+   <trkpt lat="-27.53046" lon="153.03015000000002">
+    <ele>49.28</ele>
+   </trkpt>
+   <trkpt lat="-27.530160000000002" lon="153.03050000000002">
+    <ele>51.58</ele>
+   </trkpt>
+   <trkpt lat="-27.53008" lon="153.03068000000002">
+    <ele>52.870000000000005</ele>
+   </trkpt>
+   <trkpt lat="-27.530070000000002" lon="153.03079000000002">
+    <ele>53.19</ele>
+   </trkpt>
+   <trkpt lat="-27.530070000000002" lon="153.0308">
+    <ele>53.19</ele>
+   </trkpt>
+   <trkpt lat="-27.530070000000002" lon="153.03114000000002">
+    <ele>53.75000000000001</ele>
+   </trkpt>
+   <trkpt lat="-27.53011" lon="153.03121000000002">
+    <ele>53.67</ele>
+   </trkpt>
+   <trkpt lat="-27.530205001235508" lon="153.0317849998233">
+    <ele>57.190000000000005</ele>
+   </trkpt>
+   <trkpt lat="-27.530300000000004" lon="153.03236">
+    <ele>64.26</ele>
+   </trkpt>
+  </trkseg>
+ </trk>
+</gpx>
