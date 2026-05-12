@@ -6,18 +6,18 @@
 
 ---
 
-## TL;DR — five commands
+## TL;DR — six commands
 
 ```bash
 git clone <your-private-repo>.git ~/Apps/CyclingTracker     # or copy the folder
 cd ~/Apps/CyclingTracker
 brew install python@3.11 yarn                                # one-time
-bash scripts/start-mac.sh                                    # builds + runs
-# Optional: have it start on every login
-bash scripts/install-launchd.sh
+bash scripts/start-mac.sh                                    # builds + runs (Ctrl-C to stop)
+bash scripts/install-app-icon.sh                             # puts a double-clickable icon on your Desktop
+bash scripts/install-launchd.sh                              # OPTIONAL — auto-start at every login
 ```
 
-Open `http://localhost:8765` in any browser. Done.
+Double-click **CyclingTracker** on your Desktop. Done.
 
 ---
 
@@ -69,6 +69,46 @@ The launcher takes care of everything:
 5. Opens your default browser to the app.
 
 Re-runs are fast (≈ 2 seconds): nothing rebuilds unless dependencies change.
+
+---
+
+## 3a · Double-clickable Desktop icon (recommended)
+
+After the first successful `start-mac.sh` run, build a real macOS `.app` bundle and drop it on your Desktop:
+
+```bash
+bash scripts/install-app-icon.sh
+```
+
+This creates `CyclingTracker.app` in **two** places by default:
+
+- `~/Applications/CyclingTracker.app` — for Spotlight / Launchpad / Cmd-Space
+- `~/Desktop/CyclingTracker.app` — for daily double-clicking
+
+Double-click the icon → a Terminal window opens showing live server logs → your browser opens automatically at `http://localhost:8765`. Close the Terminal window (or Ctrl-C) to quit the server.
+
+> **First launch — Gatekeeper notice.** macOS will say *"CyclingTracker can't be opened because Apple cannot check it for malicious software"* the very first time. Right-click the icon → **Open** → **Open**. macOS remembers your choice forever after.
+
+> **Already running?** Double-clicking when the server is already up just opens a new browser tab — it won't start a second instance.
+
+### Customising the icon
+The bundle ships with a generated cyan-segment placeholder. To use your own:
+
+```bash
+# Drop a 1024×1024 PNG here, then rerun:
+cp ~/Pictures/my-icon.png scripts/icon.png
+bash scripts/install-app-icon.sh
+```
+
+The script uses macOS's built-in `iconutil` + `sips` to render every required size.
+
+### Uninstall the icon
+
+```bash
+rm -rf ~/Applications/CyclingTracker.app ~/Desktop/CyclingTracker.app
+```
+
+Your data is untouched (it lives in `~/Documents/CyclingTracker/`).
 
 ---
 
@@ -203,9 +243,12 @@ The migration is idempotent: if you re-run it after adding more rides on the new
 │   ├── src/                       # React source
 │   └── package.json
 ├── scripts/
-│   ├── start-mac.sh
-│   ├── install-launchd.sh
-│   └── uninstall-launchd.sh
+│   ├── start-mac.sh             # double-click-friendly launcher
+│   ├── install-app-icon.sh      # generates CyclingTracker.app + Desktop icon
+│   ├── install-launchd.sh       # auto-start at login
+│   ├── uninstall-launchd.sh
+│   ├── make_icon.py             # regenerate placeholder icon.png
+│   └── icon.png                 # 1024×1024 source for the .app icon
 └── docs/
     └── DEPLOYMENT-macOS-10.15.md  # ← you are here
 ```
