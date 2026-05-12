@@ -30,6 +30,30 @@ HOST="${CST_HOST:-127.0.0.1}"
 DATA_DIR_DEFAULT="$HOME/Documents/CyclingTracker/data.nosync"
 export CST_DATA_DIR="${CST_DATA_DIR:-$DATA_DIR_DEFAULT}"
 
+# ---- Per-Mac server.env (auth secret + admin seed wiping) ----
+# A repo .env may carry dev placeholder secrets and an auto-seeded admin
+# account. Neither belongs on a real install. We generate a strong JWT secret
+# the first time we run, store it INSIDE the data folder (which lives under
+# the user's home, NOT in the repo, so a git pull never overwrites it), and
+# load it via an env-file override.
+SERVER_ENV="$CST_DATA_DIR/server.env"
+mkdir -p "$CST_DATA_DIR"
+if [ ! -f "$SERVER_ENV" ]; then
+    NEW_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+    cat > "$SERVER_ENV" <<ENV
+# Auto-generated on first launch — do not commit, do not share.
+JWT_SECRET=$NEW_SECRET
+ENV
+    chmod 600 "$SERVER_ENV"
+    echo "==> Generated fresh JWT_SECRET at $SERVER_ENV"
+fi
+set -a
+# shellcheck disable=SC1090
+source "$SERVER_ENV"
+set +a
+# Belt-and-braces: make sure no leftover dev seed credentials leak in.
+unset ADMIN_EMAIL ADMIN_PASSWORD
+
 echo "==> Cycling Segment Tracker 2"
 echo "    Data dir : $CST_DATA_DIR"
 echo "    Host:Port: $HOST:$PORT"
