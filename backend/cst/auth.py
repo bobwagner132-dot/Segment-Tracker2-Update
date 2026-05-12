@@ -95,21 +95,24 @@ def decode_token(token: str, expected_type: str) -> dict:
 
 # ---------- Cookie plumbing ----------
 def _cookie_kwargs(request: Optional[Request], max_age: int) -> dict:
-    # SameSite=Lax is fine for a same-origin SPA. Secure flag is needed when
-    # the page is served over HTTPS (Emergent preview, future reverse proxies);
-    # on plain HTTP local dev we leave it off so the browser still stores the
-    # cookie. We detect HTTPS via the X-Forwarded-Proto header or the request's
-    # own scheme.
-    secure = False
+    # The Emergent preview is loaded INSIDE an iframe on app.emergent.sh, which
+    # makes the preview origin a third-party context. Chrome (and Safari) will
+    # store SameSite=Lax cookies set by that origin, but they will NOT be
+    # attached to subsequent fetch/XHR calls — login succeeds, then every API
+    # call 401s. The cure is SameSite=None;Secure when the request is HTTPS.
+    # On the Mac install we serve over plain HTTP at http://localhost:8001 in
+    # the same browser tab (no iframe), so SameSite=Lax + Secure=off is the
+    # right choice there.
+    https = False
     if request is not None:
         if request.headers.get("x-forwarded-proto") == "https":
-            secure = True
+            https = True
         elif request.url.scheme == "https":
-            secure = True
+            https = True
     return {
         "httponly": True,
-        "samesite": "lax",
-        "secure": secure,
+        "samesite": "none" if https else "lax",
+        "secure": https,
         "path": "/",
         "max_age": max_age,
     }
@@ -129,8 +132,13 @@ def set_auth_cookies(response: Response, request: Request, user_id: int, email: 
 
 
 def clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie(ACCESS_COOKIE, path="/")
-    response.delete_cookie(REFRESH_COOKIE, path="/")
+    # delete_cookie defaults to samesite=lax; spell out None+Secure so the
+    # browser actually expires the cookie we set under those attributes when
+    # running inside the Emergent iframe.
+    for name in (ACCESS_COOKIE, REFRESH_COOKIE):
+        response.delete_cookie(name, path="/", samesite="none", secure=True)
+        # Also issue a Lax variant for the local-HTTP Mac install.
+        response.set_cookie(name, "", max_age=0, path="/", httponly=True, samesite="lax", secure=False)
 
 
 # ---------- User lookup helpers ----------

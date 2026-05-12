@@ -15,8 +15,18 @@ import {
   fmtDistance,
   fmtGradient,
 } from "../lib/api";
-import { Trash2, MapPin, Mountain, TrendingUp } from "lucide-react";
+import { Trash2, MapPin, Mountain, TrendingUp, Crown, Activity } from "lucide-react";
 import { toast } from "sonner";
+
+function fmtPR(secs) {
+  if (secs == null || !Number.isFinite(secs)) return "—";
+  const s = Math.max(0, Math.round(secs));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+  return `${m}:${String(ss).padStart(2, "0")}`;
+}
 
 export default function Segments() {
   const [segments, setSegments] = useState([]);
@@ -144,6 +154,24 @@ export default function Segments() {
                     <div className="text-[10px] tracking-[0.2em] uppercase text-muted mt-1">
                       {fmtDistance(s.distance_m)} · +{Math.round(s.elevation_gain_m)}m
                     </div>
+                    {s.best_effort ? (
+                      <div
+                        className="mt-2 inline-flex items-center gap-1.5 border border-volt-40 bg-volt-5 px-1.5 py-0.5"
+                        data-testid={`segment-pr-${s.id}`}
+                      >
+                        <Crown className="w-3 h-3 text-volt" strokeWidth={2} />
+                        <span className="font-num text-xs font-black text-volt">
+                          {fmtPR(s.best_effort.elapsed_s)}
+                        </span>
+                        <span className="text-[9px] tracking-[0.2em] uppercase text-muted">
+                          PR · {s.effort_count}×
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-[9px] tracking-[0.2em] uppercase text-faint">
+                        No efforts yet
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={(e) => requestDelete(s, e)}
@@ -195,6 +223,44 @@ export default function Segments() {
                 </div>
               </div>
               <MapView points={selected.points} color="#00E5FF" height={420} testid="segment-map" />
+              {selected.best_effort && (
+                <div
+                  className="border border-volt-40 bg-volt-5 p-5 flex items-center gap-5"
+                  data-testid="segment-pr-card"
+                >
+                  <Crown className="w-9 h-9 text-volt flex-shrink-0" strokeWidth={1.5} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] tracking-[0.3em] uppercase text-volt">
+                      Personal Record · {selected.effort_count}× attempts
+                    </div>
+                    <div className="font-num text-4xl font-black mt-1">
+                      {fmtPR(selected.best_effort.elapsed_s)}
+                    </div>
+                    <div className="text-xs text-secondary mt-1 truncate">
+                      on{" "}
+                      <button
+                        type="button"
+                        className="underline decoration-dotted hover:text-accent"
+                        onClick={() =>
+                          (window.location.href = `/rides?id=${encodeURIComponent(
+                            selected.best_effort.ride_id,
+                          )}`)
+                        }
+                        data-testid="segment-pr-ride-link"
+                      >
+                        {selected.best_effort.ride_name}
+                      </button>
+                      {selected.best_effort.avg_power != null && (
+                        <> · AP {Math.round(selected.best_effort.avg_power)}W</>
+                      )}
+                      {selected.best_effort.avg_hr != null && (
+                        <> · HR {Math.round(selected.best_effort.avg_hr)} bpm</>
+                      )}
+                    </div>
+                  </div>
+                  <Activity className="w-7 h-7 text-volt hidden md:block" strokeWidth={1.5} />
+                </div>
+              )}
               <ElevationChart points={selected.points} height={200} testid="segment-elevation" />
             </>
           ) : (

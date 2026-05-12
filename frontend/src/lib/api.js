@@ -18,10 +18,11 @@ class ApiError extends Error {
   }
 }
 
-async function _parseError(res) {
+async function _parseError(res, path = "") {
+  const isLogin = path.endsWith("/auth/login");
   const friendlyByStatus = {
     400: "Bad request.",
-    401: "Invalid email or password.",
+    401: isLogin ? "Invalid email or password." : "Your session expired. Please sign in again.",
     403: "You don't have permission for that.",
     404: "Not found.",
     409: "Conflict — that record already exists.",
@@ -75,7 +76,7 @@ async function _request(method, path, { body, headers, query } = {}) {
     }
   }
   const res = await fetch(url, init);
-  if (!res.ok) throw await _parseError(res);
+  if (!res.ok) throw await _parseError(res, path);
   if (res.status === 204) return null;
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) return res.json();

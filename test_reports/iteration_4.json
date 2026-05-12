@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 4 — verified the cookie iframe-fix (SameSite=None; Secure over HTTPS) and the Highlight-Best-Effort feature on /api/segments and /api/segments/{id}. Built new pytest file (7 tests, ALL PASS) and Playwright-validated the SPA login + dashboard + /segments route on the public Emergent preview URL. The previously reported user-facing 'Invalid email or password' regression is fixed: cookies are now SameSite=None;Secure with HttpOnly over HTTPS, /api/auth/me returns 200 in-browser, and the SPA renders the dashboard without bouncing back to /login.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/segments", "issue": "best_effort.elapsed_s is sometimes returned as float (e.g. 90.0) — minor type inconsistency with detector.detect_efforts. Schema says int, runtime returns float for synthetic GPX. Frontend likely tolerates it via Number(), but worth normalising via int(round(...)) in detector or routes._segment_best_map."},
+      {"endpoint": "/app/backend/tests/backend_test.py (legacy regression file)", "issue": "Pre-existing test file from iteration 3 has 27 failing tests because it never logs in — it predates the auth layer added this iteration. All other CRUD endpoints now require auth, so every assert that expects 200 hits 401. NOT a product bug; the tests need to be updated to login first (use the cookie pattern from /app/backend/tests/test_auth_and_pr.py). This is the highest-priority cleanup item for next iteration."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SignIn form", "issue": "When login fails with 401 the friendly error 'Invalid email or password' was not detected via [class*=error]/[role=alert]. The backend correctly returns it, and the api.js _parseError maps it, but no data-testid was found on the on-screen error region. Add data-testid='login-error' (or class='error') on the SignIn error <p> so users + tests can see it.", "selector": "form > .error / [data-testid=login-error]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_and_pr.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "action_items": [
+    "Update legacy /app/backend/tests/backend_test.py so each test class logs in via /api/auth/login (use a shared session fixture similar to test_auth_and_pr.py::_login_session). Currently 27/27 fail with 401.",
+    "Add data-testid='login-error' or a .error class on the SignIn screen's error <p> so the 'Invalid email or password' message is queryable + visible to the user.",
+    "(Optional polish) Normalise best_effort.elapsed_s to int in cst/routes.py _segment_best_map() — currently returns float because detector emits float."
+  ],
+  "critical_code_review_comments": [
+    "cst/auth.py::_cookie_kwargs() correctly switches between 'samesite=none + secure=True' (HTTPS / x-forwarded-proto=https) and 'samesite=lax + secure=False' (plain-HTTP Mac install). Verified live: raw Set-Cookie on the preview URL contains 'SameSite=None; Secure; HttpOnly' for both cst_access and cst_refresh.",
+    "cst/auth.py::clear_auth_cookies issues BOTH a None+Secure delete and a Lax+insecure overwrite — defensive but correct for the dual-environment story.",
+    "cst/routes.py::_segment_best_map uses a correlated subquery `e.elapsed_s = (SELECT MIN(e2.elapsed_s) ...)` plus GROUP BY segment_id to break ties — verified the fastest ride wins when two rides have efforts on the same segment.",
+    "cst/routes.py upload_segment now also returns enriched detail (best_effort=None, effort_count=0) on POST — frontend can render the PR card consistently on insert.",
+    "_segment_best_map / _segment_effort_counts both short-circuit when seg_ids is an empty list — avoids broken IN () SQL. Good.",
+    "Minor: register_failed_attempt resets failed_attempts to 0 after locking, relying solely on locked_until. Works but if the lockout window passes before the user retries, attempts start fresh — there's no audit trail of repeated lockouts. Non-blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_and_pr.py (NEW — 7 tests covering SameSite=None+Secure cookie attrs, persistence across /me /rides /segments /stats, negative login 401 message, logout, PR fields shape, PR populated after ride upload, MIN(elapsed_s) tie-break)"
+  ],
+  "success_rate": {
+    "backend": "100% on new test_auth_and_pr.py (7/7). Legacy backend_test.py is 0/27 due to pre-existing missing-login regression — needs main-agent fix.",
+    "frontend": "100% on tested flows (SPA login → dashboard nav renders with all 8 menu items + admin@example.com top-right; /segments route renders without auth bounce; in-page fetch of /api/auth/me returns 200; cookies stored as cst_access/cst_refresh with sameSite=None, secure=True, httpOnly=True in the browser jar)"
+  },
+  "test_credentials": "admin@example.com / CyclingDev123! — seeded via ADMIN_EMAIL/ADMIN_PASSWORD in /app/backend/.env. Confirmed working live.",
+  "seed_data_creation": "Tests upload synthetic GPX (segment near Eiffel Tower + 2 rides crossing it) inside isolated fixture, then wipe via DELETE /api/segments + /api/rides. DB left clean after the run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "New pytest at /app/backend/tests/test_auth_and_pr.py (7 tests, all green) is the canonical regression for auth-cookies + best_effort PR. The legacy /app/backend/tests/backend_test.py needs to be migrated to use a logged-in session fixture (27 tests currently fail with 401). Use _login_session() pattern from test_auth_and_pr.py. The new tests are self-cleaning (delete all segments + rides around each PR test).",
+  "rca of the issue": "Original bug 'Invalid email or password' on Chrome inside the Emergent preview iframe: login API returned 200 with Set-Cookie SameSite=Lax. Chrome's third-party-context rules in iframes withhold Lax cookies from cross-site XHRs → next /api/auth/me returned 401 → frontend _parseError mapped 401 to 'Invalid email or password' (its generic friendly message at the time) → user looked stuck on login despite a successful login.  FIX (this iter): cst/auth._cookie_kwargs() now picks samesite=none + secure=True when request scheme is HTTPS (or x-forwarded-proto=https) so the browser sends cookies on subsequent same-origin XHRs from the iframe; samesite=lax + secure=False kept for plain-HTTP Mac install. Additionally _parseError was scoped: 401 → 'Invalid email or password' ONLY on /auth/login; elsewhere → 'Your session expired. Please sign in again.' Verified: raw Set-Cookie contains SameSite=None; Secure; HttpOnly; SPA dashboard renders correctly post-login; in-page /api/auth/me returns 200."
+}

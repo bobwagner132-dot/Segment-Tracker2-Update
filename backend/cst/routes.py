@@ -41,7 +41,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _seg_summary(row) -> dict:
+def _seg_summary(row, best=None, effort_count=0) -> dict:
     return {
         "id": row["id"],
         "name": row["name"],
@@ -49,15 +49,66 @@ def _seg_summary(row) -> dict:
         "elevation_gain_m": row["elevation_gain_m"],
         "point_count": row["point_count"],
         "created_at": row["created_at"],
+        "effort_count": effort_count,
+        "best_effort": best,
     }
 
 
-def _seg_detail(row) -> dict:
+def _seg_detail(row, best=None, effort_count=0) -> dict:
     pts = loads_or([], row["points_json"])
     return {
-        **_seg_summary(row),
+        **_seg_summary(row, best=best, effort_count=effort_count),
         "points": decimate(pts),
     }
+
+
+def _segment_best_map(conn, uid: int, seg_ids: Optional[List[str]] = None) -> Dict[str, dict]:
+    """Return {segment_id: {effort fields}} for the user's PR per segment.
+
+    A PR is the row with the smallest `elapsed_s` for that segment. Joined
+    with rides so we can surface the ride name and start_time alongside.
+    """
+    if seg_ids is not None and len(seg_ids) == 0:
+        return {}
+    sql = (
+        "SELECT e.segment_id, e.id as effort_id, e.ride_id, e.elapsed_s, "
+        "e.datetime_utc, e.avg_power, e.avg_hr, r.name AS ride_name "
+        "FROM efforts e JOIN rides r ON r.id = e.ride_id "
+        "WHERE e.user_id = ? "
+        "AND e.elapsed_s = (SELECT MIN(e2.elapsed_s) FROM efforts e2 "
+        "WHERE e2.segment_id = e.segment_id AND e2.user_id = e.user_id)"
+    )
+    params: List[Any] = [uid]
+    if seg_ids is not None:
+        placeholders = ",".join("?" * len(seg_ids))
+        sql += f" AND e.segment_id IN ({placeholders})"
+        params.extend(seg_ids)
+    sql += " GROUP BY e.segment_id"  # if multiple rows share the min, take one
+    out: Dict[str, dict] = {}
+    for r in conn.execute(sql, params).fetchall():
+        out[r["segment_id"]] = {
+            "effort_id": r["effort_id"],
+            "ride_id": r["ride_id"],
+            "ride_name": r["ride_name"],
+            "elapsed_s": r["elapsed_s"],
+            "datetime_utc": r["datetime_utc"],
+            "avg_power": r["avg_power"],
+            "avg_hr": r["avg_hr"],
+        }
+    return out
+
+
+def _segment_effort_counts(conn, uid: int, seg_ids: Optional[List[str]] = None) -> Dict[str, int]:
+    if seg_ids is not None and len(seg_ids) == 0:
+        return {}
+    sql = "SELECT segment_id, COUNT(*) AS n FROM efforts WHERE user_id = ?"
+    params: List[Any] = [uid]
+    if seg_ids is not None:
+        placeholders = ",".join("?" * len(seg_ids))
+        sql += f" AND segment_id IN ({placeholders})"
+        params.extend(seg_ids)
+    sql += " GROUP BY segment_id"
+    return {r["segment_id"]: r["n"] for r in conn.execute(sql, params).fetchall()}
 
 
 def _ride_meta_view(row) -> dict:
@@ -123,7 +174,10 @@ def list_segments(uid: int = Depends(current_user_id)):
             "SELECT * FROM segments WHERE user_id = ? ORDER BY LOWER(name)",
             (uid,),
         ).fetchall()
-    return [_seg_summary(r) for r in rows]
+        seg_ids = [r["id"] for r in rows]
+        bests = _segment_best_map(c, uid, seg_ids)
+        counts = _segment_effort_counts(c, uid, seg_ids)
+    return [_seg_summary(r, best=bests.get(r["id"]), effort_count=counts.get(r["id"], 0)) for r in rows]
 
 
 @router.get("/segments/{seg_id}")
@@ -132,9 +186,11 @@ def get_segment(seg_id: str, uid: int = Depends(current_user_id)):
         row = c.execute(
             "SELECT * FROM segments WHERE id = ? AND user_id = ?", (seg_id, uid)
         ).fetchone()
-    if not row:
-        raise HTTPException(404, "Segment not found")
-    return _seg_detail(row)
+        if not row:
+            raise HTTPException(404, "Segment not found")
+        bests = _segment_best_map(c, uid, [seg_id])
+        counts = _segment_effort_counts(c, uid, [seg_id])
+    return _seg_detail(row, best=bests.get(seg_id), effort_count=counts.get(seg_id, 0))
 
 
 @router.post("/segments")
@@ -180,8 +236,10 @@ async def upload_segment(file: UploadFile = File(...), uid: int = Depends(curren
                 c.execute(_INSERT_EFFORT, _effort_params(uid, r["id"], seg_id, eff))
 
         new = c.execute("SELECT * FROM segments WHERE id = ?", (seg_id,)).fetchone()
+        bests = _segment_best_map(c, uid, [seg_id])
+        counts = _segment_effort_counts(c, uid, [seg_id])
     _ = saved_path  # path is captured for future reference if we want it
-    return _seg_detail(new)
+    return _seg_detail(new, best=bests.get(seg_id), effort_count=counts.get(seg_id, 0))
 
 
 @router.delete("/segments/{seg_id}")
