@@ -1,95 +1,100 @@
 # Cycling Segment Tracker 2 — PRD
 
 ## Original Problem Statement
-A personal, single-user cycling analysis web app. Upload GPX segments and GPX/FIT rides, detect segment efforts within 30m of start/end, calculate metrics (time, avg power, avg HR), show year-grouped leaderboards per segment. Data stored locally. UI inspired by Strava / Garmin Connect.
+A personal cycling analysis web app. Define segments (GPX), upload rides (GPX/FIT), detect segment efforts within 30 m of segment endpoints, track performance over time grouped by year. Now being prepared for self-hosted local deployment on macOS with SQLite + persistent file storage + multi-user-ready schema.
 
-## User Choices
-- Storage: **IndexedDB (browser-local, database `cst2`)** — migrated from MongoDB Feb 2026
-- Maps: Leaflet + OpenStreetMap (CartoDB Dark Matter / Light / OSM / OpenTopo tiles)
-- Auth: None (single-user, single-device)
-- Detection tolerance: hardcoded 30m
-- Backup: one-click JSON export + restore
-- Offline: Service Worker caches app shell + previously-viewed map tiles
+## User Choices (locked)
+- Storage engine: **SQLite** (FastAPI + sqlite3 stdlib). WAL mode on.
+- Data folder on Mac: `~/Documents/CyclingTracker/` with live DB inside `data.nosync/` (excluded from iCloud sync) and `backups/` synced. Configurable via `CST_DATA_DIR` env var.
+- Multi-user: schema includes `user_id` on every row from day one. Pass 1 ships single-user with hard-wired `default_user` (id=1). Pass 2 will add a real login.
+- Existing IndexedDB data: one-click migration button on Settings page.
+- Dormant FastAPI MongoDB code: **deleted**; replaced with this new SQLite-backed server.
+- Emergent preview: still functional — the dev container runs the same FastAPI server users will run on Mac.
 
-## Architecture
-- **Runtime**: 100% client-side. Static build served by `python3 -m http.server 8000` on Mac.
-- **Frontend**: React 19 + Tailwind + react-leaflet + recharts + sonner + idb + fit-file-parser
-- **Legacy (dormant fallback)**: FastAPI + MongoDB backend still present at `/app/backend/` but not used by the app
-- **Local stores** (IndexedDB `cst2`): `segments`, `rides`, `efforts`, `meta`
-- **Local public API** (`src/lib/api.js`): same signatures as old HTTP endpoints so pages are untouched
-  - `listSegments`, `getSegment`, `uploadSegment`, `deleteSegment`, `renameSegment`
-  - `listRides`, `getRide`, `uploadRide`, `deleteRide`, `renameRide`
-  - `listEfforts`, `getStats`, `downloadBackup`, `restoreBackup`
+## Architecture (Pass 1, May 2026)
 
-## User Persona
-Single cyclist who wants Strava-like segment analytics kept 100% locally on their Mac — offline-capable, long-term personal use.
+```
+/app/
+├── backend/
+│   ├── server.py                 # FastAPI bootstrap + CORS + startup init
+│   ├── requirements.txt          # gpxpy, fitparse, httpx, FastAPI, bcrypt (for Pass 2), PyJWT
+│   ├── .env                      # CST_DATA_DIR, JWT_SECRET
+│   └── cst/
+│       ├── db.py                 # SQLite schema, migrations, WAL, seed default_user
+│       ├── parsers.py            # GPX (gpxpy) + FIT (fitparse) → unified point dicts
+│       ├── detector.py           # haversine, hysteresis elevation gain, effort detection
+│       ├── deps.py               # current_user_id dep (returns 1 in Pass 1), bike-type aliases, reverse-geocoding
+│       └── routes.py             # All REST routes under /api/...
+├── frontend/
+│   └── src/
+│       ├── lib/
+│       │   ├── api.js            # REST client (fetch) — same exported surface as the old IndexedDB lib
+│       │   ├── migrate.js        # IndexedDB → SQLite one-shot migration
+│       │   ├── localdb.js        # Kept for migration + fsbackup helpers
+│       │   ├── fsbackup.js       # Folder-based File System Access backup (legacy, still usable)
+│       │   ├── theme.jsx
+│       │   └── utils.js
+│       └── pages/                # Unchanged — call functions in lib/api.js
+└── data/                         # Created at runtime
+    ├── database.sqlite
+    ├── uploads/{fit,gpx}/        # Original uploaded files preserved
+    └── backups/
+```
 
-## What's Implemented
-### Feb 2026 (earlier)
-- GPX segment upload, list, delete, dedup by content hash
-- GPX + FIT ride upload, list sorted by date, dedup, delete
-- Segment detection (30m haversine, direction-aware via time ordering)
-- Effort metrics: elapsed_s, avg_power, avg_hr, datetime_utc
-- Year-grouped leaderboards per segment with best effort highlight
-- Map view (CartoDB Dark Matter / Light / OSM / OpenTopo), elevation profile (recharts)
-- JSON backup / restore
-- Dashboard with stats + recent rides/segments
-- Search on segments & rides lists
-- Inline rename of rides/segments
-- Auto-naming rides via OSM Nominatim reverse geocoding ("Suburb Ride")
-- Light/dark theme, map style picker persisted in localStorage
+## REST API surface (under /api)
+- **Segments**: `GET/POST/DELETE /segments`, `GET/PATCH/DELETE /segments/{id}`, `GET /segments/{id}/efforts`
+- **Rides**: `GET/POST/DELETE /rides`, `GET/PATCH/DELETE /rides/{id}`, `PATCH /rides/{id}/meta`
+- **Bikes**: `GET /bikes` (with stats), `GET /bikes/names`, `GET /bikes/default`, `POST /bikes`, `POST /bikes/default`, `PATCH /bikes/{name}`, `GET /bikes/{name}/profile`, `POST /bikes/{name}/parts/{part}/events`, `DELETE /bikes/{name}/parts/{part}/events/{id}`, `POST /bikes/{name}/custom-parts`, `DELETE /bikes/{name}/custom-parts/{cat}/{name}`, `POST /bikes/{name}/rename`, `DELETE /bikes/{name}`
+- **Stats**: `GET /stats`, `GET /stats/yearly?year=...`
+- **Backup**: `GET /backup` (JSON), `POST /restore`, `GET /backup/zip?include_uploads=...`
+- **Admin**: `GET /admin/storage`, `GET /admin/backups`, `DELETE /admin/uploads/orphans`
+- **Health**: `GET /api/health`
 
-### Feb 2026 — Folder-based backup/restore
-- Added File System Access API integration: pick a backup folder once, app creates `Backup/` subfolder inside it, all exports go there automatically with timestamped filenames
-- Restore now lists JSONs inside the chosen folder's `Backup/` subfolder, newest first, click to restore
-- Folder handle persisted via IndexedDB `meta` store; permission re-confirmed on first use per session
-- Graceful fallback for Safari/Firefox: classic download / file picker
-- New files: `src/lib/fsbackup.js`; updated `src/lib/localdb.js` (meta helpers); rewritten `src/pages/Backup.jsx`
+## SQLite schema (key tables)
+- `users(id, email, password_hash, is_admin, created_at)` — Pass 1 seeds id=1.
+- `segments(id, user_id, name, hash, distance_m, elevation_gain_m, point_count, points_json, created_at)`
+- `rides(id, user_id, name, hash, source_type, source_filename, source_path, start_time, duration_s, distance_m, elevation_gain_m, elevation_loss_m, points_json, ...FIT metadata...)` — original file preserved on disk at `source_path`.
+- `efforts(id, user_id, ride_id, segment_id, datetime_utc, elapsed_s, moving_time_s, distance_m, avg/max power/hr/cadence/speed, elevation_gain_m, start_idx, end_idx)`
+- `bikes(id, user_id, name, type, is_default, added_at, starting_km, parts_json, custom_parts_json, created_at)`
+- `meta(user_id, key, value)`
 
-### Feb 2026 — Bike type + sub-sport auto-matching, compact upload zones, alphabetical segments
-- Added a `type` field to bike profiles (Road / Gravel / Mountain / Cyclocross / Indoor / Commute / Touring / E-bike / Track / Other). Selectable when adding a bike, editable inline on each row of Equipment, and as a fifth tile on the BikeDetail top bar.
-- Upload pipeline (`uploadRide`) now resolves the bike by:
-  1. FIT-supplied bike_name → use it,
-  2. Else if activity has a `sub_sport`: default bike if its `type` matches, otherwise the first other registered bike whose `type` matches, otherwise leave blank,
-  3. Else (e.g. GPX with no sub_sport): user's default bike.
-- Alias table covers Garmin sub_sport variants like "Gravel Cycling", "Indoor Cycling", "Cyclocross", "E_bike_fitness".
-- `UploadZone` got a `compact` prop — Segments and Activities pages now render the drop-zone + counts in a single short row instead of a tall block.
-- `listSegments()` now sorts alphabetically (case-insensitive) so segments stay in a predictable order in every selection list.
+## Completed work — Pass 1 (May 2026)
+- New FastAPI + SQLite backend with full schema and seeded `default_user`.
+- Original uploaded FIT/GPX preserved in `data/uploads/<type>/`.
+- All endpoints mirror the previous IndexedDB function surface (so pages didn't need any rewrites).
+- Hysteresis elevation, FIT session-preferred totals, speed fallback — all ported to Python.
+- Reverse geocoding (Nominatim) moved server-side.
+- Frontend `lib/api.js` rewritten as a thin fetch client.
+- Settings page got a **Migrate from browser storage** card (scan + run) that pulls everything out of the legacy IndexedDB and POSTs to `/api/restore`.
+- Old Python FastAPI MongoDB code in `/app/backend/server.py` and any MongoDB references deleted.
+- Backup ZIP endpoint (DB + uploads) + Admin storage endpoint scaffolded for Pass 2/3.
 
-### Feb 2026 — Local-first migration
-- Replaced FastAPI + MongoDB data layer with IndexedDB (via `idb`)
-- Ported GPX parser to browser DOMParser (`src/lib/parsers.js`)
-- Replaced Python `fitparse` with `fit-file-parser` npm package
-- 1:1 JS port of haversine-based effort detector (`src/lib/detector.js`)
-- SHA-256 dedup hashes via `crypto.subtle`
-- Reverse geocoding moved client-side with graceful offline fallback
-- Service worker (`public/sw.js`) caches app shell + map tiles for offline use
-- Production build (`yarn build`, `PUBLIC_URL=.`) is a single self-contained folder
-- Added `/app/README-mac.md` with Mac usage instructions
-- Backup page copy updated: MongoDB → IndexedDB
+## Verified end-to-end (Pass 1)
+- `curl POST /api/segments` (GPX) → row inserted, file saved, detail returned with decimated points.
+- `curl POST /api/rides` (same GPX) → ride row, effort row, default bike auto-assigned, original file kept.
+- Dashboard, Activities, Equipment, Settings all render with no console errors, charts populate, bike default + type round-trip persists.
+
+## Pass 2 (next) — Backups + Admin
+- `node-cron`-style scheduled backups (using APScheduler or a simple background thread).
+- Admin tab in the UI: storage usage gauges, "Backup now" button, restore-from-ZIP, orphan-uploads sweeper.
+- Configurable backup target folder (default `~/Documents/CyclingTracker/backups/`).
+- Activate real auth (call integration playbook for bcrypt+JWT pattern before writing).
+
+## Pass 3 — Mac packaging
+- `scripts/start-mac.sh` (uvicorn + open browser).
+- `scripts/install-launchd.sh` (auto-start on login).
+- Pre-build frontend to `backend/static/`, serve it from the same FastAPI process.
+- LAN-bind flag for phone/tablet access on home Wi-Fi.
+- `docs/DEPLOYMENT-macOS-10.15.md` with Python 3.11 + venv + folder layout + auto-start + iCloud notes.
 
 ## Backlog / Future
-### P1
-- Highlight best effort per segment across ALL years (currently best-effort is per year)
-- Filter rides by date range / year / sub-sport / bike
+- Highlight best effort per segment across ALL years on Leaderboards.
+- Filter Activities by date range / year / sub-sport / bike.
+- Year-over-year overlay on cumulative dashboard charts.
+- Export individual ride as GPX.
 
-### P2
-- Export individual ride as GPX
-- Import from Strava API
-- Optional PWA install prompt
-- Pre-cache tiles for a defined area ahead of a trip (offline ride prep)
-
-## Files of Reference
-- `/app/frontend/src/lib/api.js` — unified local API (replaces former axios layer)
-- `/app/frontend/src/lib/localdb.js` — IndexedDB wrapper via `idb`
-- `/app/frontend/src/lib/parsers.js` — GPX + FIT parsers (browser)
-- `/app/frontend/src/lib/detector.js` — haversine, decimation, effort detection, hashing
-- `/app/frontend/src/lib/geocode.js` — Nominatim reverse geocode (offline-safe)
-- `/app/frontend/public/sw.js` — Service worker for offline tile + app shell caching
-- `/app/frontend/src/pages/*` — unchanged, call `lib/api.js` which now runs locally
-- `/app/backend/server.py` — legacy FastAPI backend (dormant, not used)
-- `/app/README-mac.md` — Mac-specific build & run instructions
-
-## Testing status
-- Smoke test via Playwright (Feb 2026): upload GPX segment + GPX ride, verify effort auto-detected (1 segment / 1 ride / 1 effort), reload persists stats, leaderboard renders best effort, Nominatim reverse-geocoded name "Fremont Ride" applied.
-- Production build verified via `python3 -m http.server`: index.html 200, sw.js 200, main.js 200, relative asset paths.
+## Files of reference
+- `/app/backend/cst/db.py`, `routes.py`, `detector.py`, `parsers.py`, `deps.py`
+- `/app/backend/server.py`
+- `/app/frontend/src/lib/api.js`, `migrate.js`
+- `/app/frontend/src/pages/Preferences.jsx` (migration section)

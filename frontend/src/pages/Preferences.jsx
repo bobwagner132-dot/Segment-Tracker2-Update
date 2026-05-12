@@ -1,10 +1,49 @@
+import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { useTheme, MAP_STYLES } from "@/lib/theme";
-import { Moon, Sun, Palette, Database, Info, Map as MapIcon, BookOpen } from "lucide-react";
+import { migrateFromIndexedDb, readIndexedDbSnapshot } from "@/lib/migrate";
+import { toast } from "sonner";
+import { Moon, Sun, Palette, Database, Info, Map as MapIcon, BookOpen, Upload } from "lucide-react";
 
 export default function Preferences() {
   const { theme, setTheme, mapStyle, setMapStyle } = useTheme();
   const isDark = theme === "dark";
+  const [migrating, setMigrating] = useState(false);
+  const [scanCounts, setScanCounts] = useState(null);
+
+  async function scanBrowser() {
+    try {
+      const snap = await readIndexedDbSnapshot();
+      setScanCounts(snap.counts);
+      toast.success(
+        `Found ${snap.counts.rides} rides, ${snap.counts.segments} segments, ${snap.counts.bikes} bikes`,
+      );
+    } catch (e) {
+      toast.error(`Scan failed: ${e.message || e}`);
+    }
+  }
+
+  async function doMigrate() {
+    if (migrating) return;
+    if (
+      !window.confirm(
+        "This will REPLACE everything currently stored on the server with the data found in this browser's IndexedDB. Continue?",
+      )
+    ) {
+      return;
+    }
+    setMigrating(true);
+    try {
+      const r = await migrateFromIndexedDb();
+      toast.success(
+        `Migrated: ${r.counts.rides} rides · ${r.counts.segments} segments · ${r.counts.bikes} bikes`,
+      );
+    } catch (e) {
+      toast.error(`Migration failed: ${e.message || e}`);
+    } finally {
+      setMigrating(false);
+    }
+  }
 
   return (
     <div className="space-y-8 animate-fade-up max-w-3xl" data-testid="preferences-page">
@@ -195,6 +234,53 @@ export default function Preferences() {
         </div>
       </section>
 
+      <section className="border border-line bg-surface" data-testid="prefs-migrate">
+        <header className="px-6 py-4 border-b border-line-subtle flex items-center gap-3">
+          <Upload className="w-4 h-4 text-accent" strokeWidth={1.8} />
+          <div className="font-display font-bold uppercase tracking-tight">
+            Migrate from browser storage
+          </div>
+        </header>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-secondary">
+            One-shot import of any activities, segments, bikes and maintenance logs
+            still living in this browser's IndexedDB (the previous storage engine)
+            into the new SQLite database on the server. Run this once; safe to re-run.
+          </p>
+          {scanCounts && (
+            <div
+              className="text-xs uppercase tracking-[0.2em] text-muted grid grid-cols-2 sm:grid-cols-4 gap-3 border border-line-subtle p-3 bg-subtle"
+              data-testid="migrate-scan-result"
+            >
+              <Stat label="Rides" value={scanCounts.rides} />
+              <Stat label="Segments" value={scanCounts.segments} />
+              <Stat label="Efforts" value={scanCounts.efforts} />
+              <Stat label="Bikes" value={scanCounts.bikes} />
+            </div>
+          )}
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={scanBrowser}
+              disabled={migrating}
+              data-testid="migrate-scan-btn"
+              className="border border-line-strong hover:border-accent px-4 py-2 text-[11px] uppercase tracking-[0.25em] disabled:opacity-50"
+            >
+              Scan browser
+            </button>
+            <button
+              type="button"
+              onClick={doMigrate}
+              disabled={migrating}
+              data-testid="migrate-run-btn"
+              className="bg-accent text-black font-bold uppercase tracking-[0.2em] text-[11px] px-4 py-2 disabled:opacity-50"
+            >
+              {migrating ? "Migrating…" : "Migrate now"}
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section className="border border-line-subtle bg-subtle p-6 flex items-start gap-3" data-testid="prefs-about">
         <Info className="w-4 h-4 text-muted mt-0.5 flex-shrink-0" />
         <div className="text-xs text-secondary">
@@ -204,6 +290,15 @@ export default function Preferences() {
           <span className="text-accent">Backup</span> to export your full database to JSON.
         </div>
       </section>
+    </div>
+  );
+}
+
+function Stat({ label, value }) {
+  return (
+    <div>
+      <div className="text-muted text-[10px]">{label}</div>
+      <div className="font-num text-base font-bold text-main mt-1">{value}</div>
     </div>
   );
 }
