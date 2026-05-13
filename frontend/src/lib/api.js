@@ -56,7 +56,10 @@ async function _parseError(res, path = "") {
 }
 
 async function _request(method, path, { body, headers, query } = {}) {
-  const url = new URL(BASE + path);
+  // `BASE` is an absolute URL in dev (REACT_APP_BACKEND_URL is set), but on the
+  // single-port Mac install it's just "/api". `new URL("/api/...")` throws
+  // "Invalid URL", so we always supply window.location.origin as the base.
+  const url = new URL(BASE + path, window.location.origin);
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined && v !== null) url.searchParams.set(k, v);
