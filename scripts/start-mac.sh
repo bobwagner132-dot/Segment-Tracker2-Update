@@ -124,5 +124,5 @@ fi
 # ---- Run uvicorn ----
 echo "==> Server starting at http://${HOST}:${PORT}"
 echo "    (Ctrl-C to stop)"
-exec python -m uvicorn backend.server:app \
-    --host "$HOST" --port "$PORT" --app-dir .
+exec python -m uvicorn server:app \
+    --host "$HOST" --port "$PORT" --app-dir backend
