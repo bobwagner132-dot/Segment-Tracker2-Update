@@ -1,0 +1,33 @@
+# Cycling Segment Tracker 2 — Mac install requirements.
+# This is the MINIMAL set of packages the app actually imports.
+# The much larger requirements.txt in this folder is the Emergent dev-container
+# baseline (frozen with `pip freeze`) and contains ~100 packages from the base
+# image that this app never uses. Don't install that one on the Mac — it's slow
+# and pulls in some packages that have no pre-built wheels for macOS 10.15.
+
+# Web framework + ASGI server
+fastapi==0.110.1
+uvicorn[standard]==0.25.0
+python-multipart==0.0.27
+email-validator==2.3.0
+
+# Auth
+bcrypt==4.1.3
+PyJWT==2.12.1
+
+# File parsing (rides + segments)
+gpxpy==1.6.2
+fitparse==1.2.0
+
+# Background jobs (nightly backups)
+APScheduler==3.10.4
+
+# Outbound HTTP (OpenStreetMap Nominatim reverse-geocoding)
+httpx==0.28.1
+
+# Env file loading
+python-dotenv==1.2.2
+
+# Test deps (used by backend/tests/*.py — optional but tiny)
+pytest==9.0.3
+requests==2.33.1

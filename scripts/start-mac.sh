@@ -81,12 +81,17 @@ fi
 source .venv/bin/activate
 
 # Upgrade pip quietly and install/update deps if requirements changed.
+# Mac uses a minimal requirements file (backend/requirements-mac.txt) — the
+# full requirements.txt is the Emergent dev-container `pip freeze` baseline
+# with ~100 unused packages (and a few that have no wheels for macOS 10.15).
+REQ_FILE="backend/requirements-mac.txt"
+[ -f "$REQ_FILE" ] || REQ_FILE="backend/requirements.txt"
 HASH_FILE=".venv/.requirements.sha"
-NEW_HASH=$(shasum backend/requirements.txt | awk '{print $1}')
+NEW_HASH=$(shasum "$REQ_FILE" | awk '{print $1}')
 if [ ! -f "$HASH_FILE" ] || [ "$(cat "$HASH_FILE")" != "$NEW_HASH" ]; then
-    echo "==> Installing Python dependencies"
+    echo "==> Installing Python dependencies from $REQ_FILE"
     pip install --upgrade pip >/dev/null
-    pip install -r backend/requirements.txt
+    pip install -r "$REQ_FILE"
     echo "$NEW_HASH" > "$HASH_FILE"
 fi
 

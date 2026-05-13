@@ -62,7 +62,7 @@ bash scripts/start-mac.sh
 
 The launcher takes care of everything:
 
-1. Creates a virtualenv at `./.venv` and installs `backend/requirements.txt`.
+1. Creates a virtualenv at `./.venv` and installs `backend/requirements-mac.txt` (a slim, Mac-tested subset of the deps — *not* the larger `requirements.txt`, which is the Emergent dev-container baseline and includes ~100 unused packages plus a few that have no pre-built wheels for macOS 10.15).
 2. Runs `yarn install` and `yarn build` if `frontend/build/` is missing.
 3. Ensures the data folder exists at `~/Documents/CyclingTracker/data.nosync/`.
 4. Starts `uvicorn` at `http://127.0.0.1:8765`.
