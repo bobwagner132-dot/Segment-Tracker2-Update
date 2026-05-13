@@ -9,7 +9,8 @@
 /coverage
 
 # production
-/build
+# (Intentionally tracked so the Mac install can skip `yarn build`.)
+# /build
 
 # misc
 .DS_Store

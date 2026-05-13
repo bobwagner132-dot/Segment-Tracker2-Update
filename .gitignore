@@ -26,7 +26,11 @@ next-env.d.ts
 *.tsbuildinfo
 
 # Production builds
-/build
+# (frontend/build is INTENTIONALLY tracked so the Mac install can skip the
+# yarn-build step. It's a small static bundle and shipping it pre-built
+# avoids forcing every user to install Node.)
+!frontend/build
+!frontend/build/**
 dist/
 dist
 
