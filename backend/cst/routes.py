@@ -61,6 +61,45 @@ def stream_frontend_build():
     )
 
 
+@router.get("/__mac_install/update.tar.gz")
+def stream_full_update():
+    """Streams the bits a Mac install needs to refresh: the entire backend/
+    Python tree + the pre-built frontend/build/. Everything else (data,
+    venv, node_modules, scripts) is excluded so a `tar -xzf` over the top
+    is safe and idempotent.
+    """
+    import tarfile, io
+    root = Path(__file__).resolve().parent.parent.parent
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        # Backend Python sources (skip __pycache__).
+        backend_dir = root / "backend"
+        for sub in ("cst", "tests"):
+            p = backend_dir / sub
+            if p.exists():
+                tar.add(str(p), arcname=f"backend/{sub}",
+                        filter=lambda ti: None if "__pycache__" in ti.name else ti)
+        for f in ("server.py", "requirements.txt", "requirements-mac.txt"):
+            p = backend_dir / f
+            if p.exists():
+                tar.add(str(p), arcname=f"backend/{f}")
+        # Pre-built frontend.
+        fb = root / "frontend" / "build"
+        if fb.exists():
+            tar.add(str(fb), arcname="frontend/build")
+        # Launcher scripts.
+        scripts = root / "scripts"
+        if scripts.exists():
+            tar.add(str(scripts), arcname="scripts",
+                    filter=lambda ti: None if "__pycache__" in ti.name else ti)
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="application/gzip",
+        headers={"Content-Disposition": 'attachment; filename="update.tar.gz"'},
+    )
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
