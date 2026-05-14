@@ -165,3 +165,5 @@ credentials.json
 *.pem
 *.key
 .credentials
+Project2.zip
+frontend/node_modules/.cache/default-development/25.pack

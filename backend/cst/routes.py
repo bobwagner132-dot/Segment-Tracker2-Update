@@ -37,6 +37,30 @@ from . import scheduler as backup_scheduler
 router = APIRouter(prefix="/api")
 
 
+# ---------- Mac-install bootstrap helper ----------
+# One-shot endpoint that streams the entire pre-built frontend as a tarball.
+# Lets Mac users `curl` the latest build directly from the Emergent preview
+# URL when Emergent's "Download Project" ZIP exporter silently strips
+# frontend/build/ (it ignores any folder named `build` regardless of
+# .gitignore overrides). No auth required because the bundle is public
+# static assets anyway.
+@router.get("/__mac_install/frontend-build.tar.gz")
+def stream_frontend_build():
+    import tarfile, io
+    build_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "build"
+    if not build_dir.exists():
+        raise HTTPException(404, "frontend/build is not present on the server")
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        tar.add(str(build_dir), arcname="build")
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="application/gzip",
+        headers={"Content-Disposition": 'attachment; filename="frontend-build.tar.gz"'},
+    )
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
