@@ -46,7 +46,8 @@ router = APIRouter(prefix="/api")
 # static assets anyway.
 @router.get("/__mac_install/frontend-build.tar.gz")
 def stream_frontend_build():
-    import tarfile, io
+    import tarfile
+    import io
     build_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "build"
     if not build_dir.exists():
         raise HTTPException(404, "frontend/build is not present on the server")
@@ -68,7 +69,8 @@ def stream_full_update():
     venv, node_modules, scripts) is excluded so a `tar -xzf` over the top
     is safe and idempotent.
     """
-    import tarfile, io
+    import tarfile
+    import io
     root = Path(__file__).resolve().parent.parent.parent
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
@@ -308,6 +310,10 @@ async def upload_segment(file: UploadFile = File(...), uid: int = Depends(curren
 @router.delete("/segments/{seg_id}")
 def delete_segment(seg_id: str, uid: int = Depends(current_user_id)):
     with get_conn() as c:
+        # Belt-and-braces: explicitly wipe efforts for this segment first.
+        # FK cascade does this too, but legacy DBs sometimes accumulated
+        # orphans when foreign_keys wasn't enabled on every connection.
+        c.execute("DELETE FROM efforts WHERE segment_id = ? AND user_id = ?", (seg_id, uid))
         cur = c.execute(
             "DELETE FROM segments WHERE id = ? AND user_id = ?", (seg_id, uid)
         )
@@ -607,6 +613,8 @@ def delete_ride(ride_id: str, uid: int = Depends(current_user_id)):
         ).fetchone()
         if not row:
             raise HTTPException(404, "Ride not found")
+        # Belt-and-braces — see delete_segment.
+        c.execute("DELETE FROM efforts WHERE ride_id = ? AND user_id = ?", (ride_id, uid))
         c.execute("DELETE FROM rides WHERE id = ? AND user_id = ?", (ride_id, uid))
     if row["source_path"]:
         try:
@@ -680,6 +688,8 @@ def delete_all_rides(uid: int = Depends(current_user_id)):
         paths = [r["source_path"] for r in c.execute(
             "SELECT source_path FROM rides WHERE user_id = ?", (uid,)
         ).fetchall() if r["source_path"]]
+        # Wipe efforts first so leaderboards don't show ghost entries.
+        c.execute("DELETE FROM efforts WHERE user_id = ?", (uid,))
         c.execute("DELETE FROM rides WHERE user_id = ?", (uid,))
     for p in paths:
         try:

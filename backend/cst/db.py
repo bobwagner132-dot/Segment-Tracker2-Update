@@ -202,3 +202,9 @@ def init_db() -> None:
                 "VALUES (?, ?, NULL, 1, ?)",
                 (DEFAULT_USER_ID, DEFAULT_USER_EMAIL, _now_iso()),
             )
+        # One-shot orphan cleanup — drops any effort whose segment or ride
+        # was deleted in a prior version that relied on FK cascade alone.
+        c.execute(
+            "DELETE FROM efforts WHERE segment_id NOT IN (SELECT id FROM segments) "
+            "OR ride_id NOT IN (SELECT id FROM rides)"
+        )

@@ -17,6 +17,7 @@ import {
   addPartEvent,
   BIKE_TYPES,
   deletePartEvent,
+  fmtDateDMY,
   getBikeProfileWithStats,
   removeCustomPart,
   updateBikeProfile,
@@ -250,7 +251,7 @@ function Stat({ label, value, icon: Icon, editable, type = "number", onChange, s
             onClick={() => setEditing(true)}
             className={`font-num text-2xl font-black mt-1 hover:text-accent text-left ${highlight ? "text-accent" : ""}`}
           >
-            {value || "—"} {suffix && value ? <span className="text-sm text-muted">{suffix}</span> : null}
+            {(type === "date" ? fmtDateDMY(value) : value) || "—"} {suffix && value ? <span className="text-sm text-muted">{suffix}</span> : null}
           </button>
         )
       ) : (
@@ -297,7 +298,7 @@ function PartRow({
         </div>
         <div className="text-[10px] tracking-[0.2em] uppercase text-muted truncate ml-4">
           {latest
-            ? `${latest.action} · ${latest.date}${latest.at_km ? ` · ${latest.at_km} km` : ""}`
+            ? `${latest.action} · ${fmtDateDMY(latest.date)}${latest.at_km ? ` · ${latest.at_km} km` : ""}`
             : "No log entries"}
         </div>
       </button>
@@ -316,7 +317,7 @@ function PartRow({
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-main">
                       {e.action}
-                      <span className="text-muted font-normal"> · {e.date}</span>
+                      <span className="text-muted font-normal"> · {fmtDateDMY(e.date)}</span>
                       {e.at_km != null && (
                         <span className="text-muted font-normal"> · {e.at_km} km</span>
                       )}

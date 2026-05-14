@@ -379,6 +379,25 @@ export function fmtDateLocal(iso) {
   }
 }
 
+// Day-first format (dd-mm-yyyy) used in the bike maintenance log so the
+// dates read naturally for the UK/EU user base. Accepts either an ISO
+// date (`2026-05-14`) or a full ISO datetime — both common in our data.
+export function fmtDateDMY(iso) {
+  if (!iso) return "—";
+  // Parse "YYYY-MM-DD" directly to avoid timezone shifts that would
+  // turn the user's chosen day into "the day before" in negative UTC offsets.
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+  } catch {
+    return "—";
+  }
+}
+
 export function localYear(iso) {
   if (!iso) return null;
   try {
