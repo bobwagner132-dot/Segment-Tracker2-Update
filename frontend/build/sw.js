@@ -3,7 +3,7 @@
 // - Network-first with cache fallback for app assets & fonts
 // Version bump = force refresh of cached assets.
 
-const APP_CACHE = "cst-app-v2";
+const APP_CACHE = "cst-app-v3";
 const TILE_CACHE = "cst-tiles-v1";
 
 const TILE_HOSTS = [
