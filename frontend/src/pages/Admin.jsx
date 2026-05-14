@@ -51,6 +51,8 @@ export default function Admin() {
   const [busy, setBusy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(null);
   const [confirmOrphans, setConfirmOrphans] = useState(false);
+  const [confirmWipeEfforts, setConfirmWipeEfforts] = useState(false);
+  const [confirmWipeOrphanEfforts, setConfirmWipeOrphanEfforts] = useState(false);
   const uploadRef = useRef(null);
 
   async function refresh() {
@@ -137,6 +139,34 @@ export default function Admin() {
       await refresh();
     } catch (e) {
       toast.error(`Sweep failed: ${e.message || e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function wipeAllEfforts() {
+    setConfirmWipeEfforts(false);
+    setBusy(true);
+    try {
+      const r = await _json("DELETE", "/admin/efforts");
+      toast.success(`Wiped ${r.removed} leaderboard entries`);
+      await refresh();
+    } catch (e) {
+      toast.error(`Wipe failed: ${e.message || e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function wipeOrphanEffortsOnly() {
+    setConfirmWipeOrphanEfforts(false);
+    setBusy(true);
+    try {
+      const r = await _json("DELETE", "/admin/efforts/orphans");
+      toast.success(`Cleaned ${r.removed} orphan effort(s)`);
+      await refresh();
+    } catch (e) {
+      toast.error(`Cleanup failed: ${e.message || e}`);
     } finally {
       setBusy(false);
     }
@@ -360,6 +390,37 @@ export default function Admin() {
         </button>
       </section>
 
+      {/* Leaderboard / efforts maintenance */}
+      <section
+        className="border border-dashed border-line-strong bg-subtle p-5 flex flex-wrap items-center gap-3"
+        data-testid="admin-efforts"
+      >
+        <Trash2 className="w-4 h-4 text-danger flex-shrink-0" />
+        <div className="text-sm flex-1">
+          Detected segment efforts power the leaderboards. Clean up orphans
+          (efforts whose segment or activity was deleted) or wipe everything
+          and start fresh — re-uploading a ride re-detects efforts.
+        </div>
+        <button
+          type="button"
+          onClick={() => setConfirmWipeOrphanEfforts(true)}
+          disabled={busy}
+          data-testid="admin-clean-orphan-efforts"
+          className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] font-bold text-secondary hover:text-accent disabled:opacity-40"
+        >
+          Clean orphans
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmWipeEfforts(true)}
+          disabled={busy}
+          data-testid="admin-wipe-leaderboards"
+          className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] font-bold text-danger hover:opacity-80 disabled:opacity-40"
+        >
+          Wipe all leaderboards
+        </button>
+      </section>
+
       <ConfirmDialog
         open={!!confirmRestore}
         title={`Restore ${confirmRestore?.name}?`}
@@ -381,6 +442,27 @@ export default function Admin() {
         testid="admin-confirm-orphans"
         onConfirm={sweepOrphans}
         onCancel={() => setConfirmOrphans(false)}
+      />
+      <ConfirmDialog
+        open={confirmWipeOrphanEfforts}
+        title="Clean orphan efforts?"
+        description="Efforts pointing at segments or activities that no longer exist will be removed. Your segments, activities, and current leaderboard entries are kept."
+        confirmLabel="Clean"
+        cancelLabel="Cancel"
+        testid="admin-confirm-clean-orphan-efforts"
+        onConfirm={wipeOrphanEffortsOnly}
+        onCancel={() => setConfirmWipeOrphanEfforts(false)}
+      />
+      <ConfirmDialog
+        open={confirmWipeEfforts}
+        title="Wipe every leaderboard entry?"
+        description="All detected segment efforts are deleted. Segments and activities are kept — re-uploading a ride will re-detect efforts automatically."
+        confirmLabel="Wipe leaderboards"
+        cancelLabel="Cancel"
+        destructive
+        testid="admin-confirm-wipe-leaderboards"
+        onConfirm={wipeAllEfforts}
+        onCancel={() => setConfirmWipeEfforts(false)}
       />
     </div>
   );

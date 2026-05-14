@@ -1395,6 +1395,30 @@ async def restore_zip_upload(file: UploadFile = File(...), uid: int = Depends(cu
     return backup_scheduler.restore_zip(target)
 
 
+@router.delete("/admin/efforts")
+def wipe_all_efforts(uid: int = Depends(current_user_id)):
+    """Wipe every detected effort for the current user. Segments and rides
+    are kept; only the leaderboard data goes. Re-uploading a ride will
+    re-detect efforts automatically."""
+    with get_conn() as c:
+        cur = c.execute("DELETE FROM efforts WHERE user_id = ?", (uid,))
+    return {"ok": True, "removed": cur.rowcount}
+
+
+@router.delete("/admin/efforts/orphans")
+def wipe_orphan_efforts(uid: int = Depends(current_user_id)):
+    """Remove only efforts pointing at deleted segments or rides — keeps
+    the rest intact. Belt-and-braces companion to the FK cascade."""
+    with get_conn() as c:
+        cur = c.execute(
+            "DELETE FROM efforts WHERE user_id = ? AND ("
+            "segment_id NOT IN (SELECT id FROM segments WHERE user_id = ?) "
+            "OR ride_id NOT IN (SELECT id FROM rides WHERE user_id = ?))",
+            (uid, uid, uid),
+        )
+    return {"ok": True, "removed": cur.rowcount}
+
+
 @router.get("/health")
 def health():
     return {"ok": True, "data_dir": str(DATA_DIR), "db": str(db.DB_PATH)}
