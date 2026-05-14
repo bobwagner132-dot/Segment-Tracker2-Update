@@ -1,21 +1,18 @@
 // Auth context for Cycling Segment Tracker 2.
 //
 // `<AuthProvider>` is mounted at the root. It exposes:
-//   - state: "loading" | "needs_setup" | "logged_out" | "logged_in"
+//   - state: "loading" | "logged_out" | "logged_in"
 //   - user : the current user object (only when logged_in)
-//   - login(email, password)
+//   - signIn(name)  — passwordless sign-in by display name
 //   - logout()
-//   - completeSetup(email, password)  — used on first-run wizard
 //
-// `<RequireAuth>` is a route guard that renders <Login /> or <SetupWizard />
-// as appropriate when the user isn't signed in.
+// First sign-in with an unseen name auto-creates that profile on the backend.
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   authStatus,
-  login as apiLogin,
+  signIn as apiSignIn,
   logout as apiLogout,
-  setInitialPassword,
 } from "./api";
 
 const AuthCtx = createContext(null);
@@ -27,10 +24,7 @@ export function AuthProvider({ children }) {
   const refresh = useCallback(async () => {
     try {
       const s = await authStatus();
-      if (s.needs_setup) {
-        setState("needs_setup");
-        setUser(null);
-      } else if (s.authenticated && s.user) {
+      if (s.authenticated && s.user) {
         setState("logged_in");
         setUser(s.user);
       } else {
@@ -47,15 +41,8 @@ export function AuthProvider({ children }) {
     refresh();
   }, [refresh]);
 
-  const login = useCallback(async (email, password) => {
-    const r = await apiLogin(email, password);
-    setUser(r.user);
-    setState("logged_in");
-    return r.user;
-  }, []);
-
-  const completeSetup = useCallback(async (email, password) => {
-    const r = await setInitialPassword(email, password);
+  const signIn = useCallback(async (name) => {
+    const r = await apiSignIn(name);
     setUser(r.user);
     setState("logged_in");
     return r.user;
@@ -71,7 +58,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthCtx.Provider value={{ state, user, login, logout, completeSetup, refresh }}>
+    <AuthCtx.Provider value={{ state, user, signIn, logout, refresh }}>
       {children}
     </AuthCtx.Provider>
   );

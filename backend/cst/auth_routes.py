@@ -23,6 +23,10 @@ class LoginBody(BaseModel):
     password: str
 
 
+class SignInBody(BaseModel):
+    name: str
+
+
 class SetInitialBody(BaseModel):
     email: EmailStr
     password: str
@@ -30,10 +34,10 @@ class SetInitialBody(BaseModel):
 
 @router.get("/status")
 def status(request: Request) -> dict:
-    """Always open. Tells the SPA whether to show the login screen, the
-    first-run setup wizard, or the main app.
+    """Always open. The SPA uses this to decide between the sign-in screen
+    and the main app. There's no longer a first-run/setup step — the first
+    name typed in the sign-in form auto-creates that profile.
     """
-    needs_setup = not auth.has_any_active_user()
     user = None
     token = request.cookies.get(auth.ACCESS_COOKIE)
     if token:
@@ -45,10 +49,55 @@ def status(request: Request) -> dict:
         except Exception:
             user = None
     return {
-        "needs_setup": needs_setup,
         "authenticated": user is not None,
         "user": user,
     }
+
+
+@router.post("/sign-in")
+def sign_in(body: SignInBody, request: Request, response: Response) -> dict:
+    """Passwordless sign-in by name. Auto-creates the profile on first use.
+
+    Designed for the single-Mac local-first install where each "user" is just
+    a separate data scope (separate rides, segments, bikes). macOS itself
+    gates physical access; this endpoint exists solely to identify which
+    profile to load.
+    """
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    if len(name) > 60:
+        raise HTTPException(status_code=400, detail="Name is too long (max 60 chars)")
+
+    # Case-insensitive lookup (so "Bob" and "bob" map to the same profile)
+    # but preserve the original casing on first creation so the header shows
+    # the name the user actually typed.
+    user = auth.fetch_user_by_email(name)
+    if not user:
+        with get_conn() as c:
+            seed = c.execute(
+                "SELECT id FROM users WHERE id = ? AND password_hash IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM rides WHERE user_id = users.id) "
+                "AND NOT EXISTS (SELECT 1 FROM segments WHERE user_id = users.id)",
+                (DEFAULT_USER_ID,),
+            ).fetchone()
+            if seed:
+                c.execute(
+                    "UPDATE users SET email = ?, is_admin = 1 WHERE id = ?",
+                    (name, DEFAULT_USER_ID),
+                )
+                new_id = DEFAULT_USER_ID
+            else:
+                c.execute(
+                    "INSERT INTO users (email, is_admin, created_at) VALUES (?, 1, ?)",
+                    (name, _now_iso()),
+                )
+                new_id = c.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+        user = auth.fetch_user(new_id)
+
+    auth.register_successful_login(user["id"])
+    auth.set_auth_cookies(response, request, user["id"], user["email"])
+    return {"ok": True, "user": auth.public_user(auth.fetch_user(user["id"]))}
 
 
 @router.post("/set-initial-password")

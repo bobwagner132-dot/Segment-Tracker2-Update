@@ -19,10 +19,10 @@ class ApiError extends Error {
 }
 
 async function _parseError(res, path = "") {
-  const isLogin = path.endsWith("/auth/login");
+  const isSignIn = path.endsWith("/auth/sign-in");
   const friendlyByStatus = {
     400: "Bad request.",
-    401: isLogin ? "Invalid email or password." : "Your session expired. Please sign in again.",
+    401: isSignIn ? "Couldn't sign you in." : "Your session expired. Please sign in again.",
     403: "You don't have permission for that.",
     404: "Not found.",
     409: "Conflict — that record already exists.",
@@ -115,14 +115,11 @@ export function formatApiError(err) {
 export async function authStatus() {
   return apiGet("/auth/status");
 }
-export async function login(email, password) {
-  return apiPost("/auth/login", { email, password });
+export async function signIn(name) {
+  return apiPost("/auth/sign-in", { name });
 }
 export async function logout() {
   return apiPost("/auth/logout");
-}
-export async function setInitialPassword(email, password) {
-  return apiPost("/auth/set-initial-password", { email, password });
 }
 export async function fetchMe() {
   return apiGet("/auth/me");

@@ -35,6 +35,16 @@ FAILED_ATTEMPT_LIMIT = 5
 LOCKOUT_MINUTES = 15
 
 
+def auth_disabled() -> bool:
+    """Read CST_AUTH_DISABLED at call time, not import time, so the Mac
+    launcher can flip it before each request without restart races.
+    Truthy values: 1, true, yes, on (case-insensitive).
+    """
+    return (os.environ.get("CST_AUTH_DISABLED") or "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
 def _secret() -> str:
     v = os.environ.get("JWT_SECRET")
     if not v:
