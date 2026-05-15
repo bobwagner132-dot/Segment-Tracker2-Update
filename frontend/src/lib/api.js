@@ -342,7 +342,7 @@ export async function deleteOrphanUploads() {
 }
 
 export function backupZipUrl({ includeUploads = true } = {}) {
-  const u = new URL(BASE + "/backup/zip");
+  const u = new URL(BASE + "/backup/zip", window.location.origin);
   u.searchParams.set("include_uploads", includeUploads ? "true" : "false");
   return u.toString();
 }
