@@ -104,6 +104,22 @@ def _closest_index(points: Sequence[dict], target: dict) -> tuple[int, float]:
     return best_i, best_d
 
 
+def _cluster_indices(indices: Sequence[int], max_gap: int = 5) -> List[List[int]]:
+    """Group a sorted list of ride-point indices into contiguous clusters.
+
+    A cluster is a run of indices whose gap to the previous one is ≤ max_gap.
+    Used to collapse the dozen-or-so consecutive in-disc points that one
+    physical pass produces into a single logical entry/exit event.
+    """
+    out: List[List[int]] = []
+    for i in indices:
+        if out and i - out[-1][-1] <= max_gap:
+            out[-1].append(i)
+        else:
+            out.append([i])
+    return out
+
+
 def detect_efforts(
     ride_points: Sequence[dict],
     segment_points: Sequence[dict],
@@ -112,38 +128,58 @@ def detect_efforts(
     """Find every contiguous slice of `ride_points` that starts within `radius`
     of the segment start, passes through the middle, and ends within `radius`
     of the segment end. Returns a list of effort summaries.
+
+    The matcher clusters consecutive in-disc points so that a single physical
+    pass (which yields ~12 GPS points inside the 30 m disc at typical cycling
+    speeds) becomes one logical "start" + one logical "end" event, not 12.
     """
     if len(ride_points) < 2 or len(segment_points) < 2:
         return []
     seg_start = segment_points[0]
     seg_end = segment_points[-1]
 
-    # Candidate start/end indices: every ride point inside the start/end disc.
-    start_idxs = [
-        i
-        for i, p in enumerate(ride_points)
-        if haversine_m(p["lat"], p["lon"], seg_start["lat"], seg_start["lon"]) <= radius
-    ]
-    end_idxs = [
-        i
-        for i, p in enumerate(ride_points)
-        if haversine_m(p["lat"], p["lon"], seg_end["lat"], seg_end["lon"]) <= radius
-    ]
-    if not start_idxs or not end_idxs:
+    # Compute distance to seg_start / seg_end for every ride point once.
+    start_disc_idxs: List[int] = []
+    end_disc_idxs: List[int] = []
+    for i, p in enumerate(ride_points):
+        if haversine_m(p["lat"], p["lon"], seg_start["lat"], seg_start["lon"]) <= radius:
+            start_disc_idxs.append(i)
+        if haversine_m(p["lat"], p["lon"], seg_end["lat"], seg_end["lon"]) <= radius:
+            end_disc_idxs.append(i)
+    if not start_disc_idxs or not end_disc_idxs:
         return []
+
+    # Collapse runs of consecutive in-disc points (one physical pass = one cluster).
+    # Inside each cluster we keep the index closest to the segment endpoint —
+    # that yields the tightest slice timing.
+    def _best_in_cluster(cluster: List[int], target: dict) -> int:
+        best_i = cluster[0]
+        best_d = float("inf")
+        for i in cluster:
+            p = ride_points[i]
+            d = haversine_m(p["lat"], p["lon"], target["lat"], target["lon"])
+            if d < best_d:
+                best_d = d
+                best_i = i
+        return best_i
+
+    start_clusters = _cluster_indices(start_disc_idxs)
+    end_clusters = _cluster_indices(end_disc_idxs)
+    starts = [_best_in_cluster(c, seg_start) for c in start_clusters]
+    ends = [_best_in_cluster(c, seg_end) for c in end_clusters]
 
     used_end = -1
     efforts: List[dict] = []
-    for s in start_idxs:
-        # First end index strictly after this start and after the previously
-        # consumed end (so two efforts can't overlap).
-        e = next((j for j in end_idxs if j > s and j > used_end), None)
+    mid = segment_points[len(segment_points) // 2]
+    for s in starts:
+        e = next((j for j in ends if j > s and j > used_end), None)
         if e is None:
             continue
         slice_pts = ride_points[s : e + 1]
-        # Sanity: ride slice should pass near the segment midpoint, otherwise
-        # we caught a U-turn or stop-and-return.
-        mid = segment_points[len(segment_points) // 2]
+        # Sanity: must pass near the segment midpoint — guards against
+        # spurious matches where the rider entered the start disc but
+        # didn't actually traverse the segment (e.g. they crossed a road
+        # tangentially, or did a U-turn).
         _, mid_d = _closest_index(slice_pts, mid)
         if mid_d > radius * 4:
             continue
