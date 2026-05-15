@@ -178,6 +178,11 @@ def detect_efforts(
     seg_distance = total_distance_m(segment_points)
     min_slice_distance = seg_distance * 0.6  # reject slices that obviously didn't cover the segment
     for s in starts:
+        # A start that falls inside an already-consumed slice is a duplicate
+        # caused by GPS jitter splitting a single physical entry into two
+        # nearby start clusters — skip it.
+        if s <= used_end:
+            continue
         e = next((j for j in ends if j > s and j > used_end), None)
         if e is None:
             continue
