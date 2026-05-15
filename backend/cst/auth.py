@@ -29,8 +29,10 @@ from .db import DEFAULT_USER_ID, get_conn
 JWT_ALG = "HS256"
 ACCESS_COOKIE = "cst_access"
 REFRESH_COOKIE = "cst_refresh"
-ACCESS_MAX_AGE = 15 * 60          # 15 minutes
-REFRESH_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
+ACCESS_MAX_AGE = 365 * 24 * 60 * 60  # 1 year — local-first single-user app on
+#                                      the user's own Mac; macOS itself gates
+#                                      physical access, no need to auto-expire.
+REFRESH_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
 FAILED_ATTEMPT_LIMIT = 5
 LOCKOUT_MINUTES = 15
 
