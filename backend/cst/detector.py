@@ -104,12 +104,16 @@ def _closest_index(points: Sequence[dict], target: dict) -> tuple[int, float]:
     return best_i, best_d
 
 
-def _cluster_indices(indices: Sequence[int], max_gap: int = 5) -> List[List[int]]:
+def _cluster_indices(indices: Sequence[int], max_gap: int = 8) -> List[List[int]]:
     """Group a sorted list of ride-point indices into contiguous clusters.
 
     A cluster is a run of indices whose gap to the previous one is ≤ max_gap.
     Used to collapse the dozen-or-so consecutive in-disc points that one
-    physical pass produces into a single logical entry/exit event.
+    physical pass produces into a single logical entry/exit event. The 8-
+    point default tolerates ~8 s of GPS dropout / under-bridge noise without
+    splitting a single physical pass into two phantom passes, while still
+    leaving real out-and-back loops as separate clusters (the rider has to
+    leave the disc for many more seconds to come back).
     """
     out: List[List[int]] = []
     for i in indices:
@@ -171,17 +175,25 @@ def detect_efforts(
     used_end = -1
     efforts: List[dict] = []
     mid = segment_points[len(segment_points) // 2]
+    seg_distance = total_distance_m(segment_points)
+    min_slice_distance = seg_distance * 0.6  # reject slices that obviously didn't cover the segment
     for s in starts:
         e = next((j for j in ends if j > s and j > used_end), None)
         if e is None:
             continue
         slice_pts = ride_points[s : e + 1]
-        # Sanity: must pass near the segment midpoint — guards against
+        # Sanity 1: must pass near the segment midpoint — guards against
         # spurious matches where the rider entered the start disc but
         # didn't actually traverse the segment (e.g. they crossed a road
         # tangentially, or did a U-turn).
         _, mid_d = _closest_index(slice_pts, mid)
         if mid_d > radius * 4:
+            continue
+        # Sanity 2: the slice must cover at least 60% of the segment's own
+        # length. This filters out the "GPS jitter created a fake second
+        # cluster a few metres from the first" failure mode that produced
+        # duplicate near-identical efforts in earlier builds.
+        if total_distance_m(slice_pts) < min_slice_distance:
             continue
         used_end = e
         efforts.append(_summarise_effort(slice_pts, s, e))
