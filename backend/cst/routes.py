@@ -893,7 +893,7 @@ def _bike_profile_response(row, uid: int):
         "parts": loads_or({}, row["parts_json"]),
         "custom_parts": loads_or({}, row["custom_parts_json"]),
         "ridden_km": ridden_km,
-        "total_km": round((row["starting_km"] or 0 + ridden_km) * 10) / 10,
+        "total_km": round(((row["starting_km"] or 0) + ridden_km) * 10) / 10,
     }
 
 
