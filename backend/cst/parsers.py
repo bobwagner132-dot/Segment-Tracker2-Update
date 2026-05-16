@@ -153,9 +153,20 @@ def parse_fit(raw: bytes) -> dict:
             device = str(prod)
             break
 
+    # Normalise sub_sport: FIT exporters often record indoor / trainer / virtual
+    # rides as the catch-all "generic" sub_sport. Treat that — and any obvious
+    # indoor variant — as "Indoor" so the UI groups them cleanly and the
+    # auto-name flow can flag them.
+    raw_sub = (session.get("sub_sport") or "")
+    raw_sub_lc = str(raw_sub).lower()
+    if raw_sub_lc in {"generic", "indoor_cycling", "virtual_activity", "trainer"}:
+        sub_sport_value = "Indoor"
+    else:
+        sub_sport_value = _title_case(session.get("sub_sport"))
+
     meta = {
         "sport": _title_case(session.get("sport")),
-        "sub_sport": _title_case(session.get("sub_sport")),
+        "sub_sport": sub_sport_value,
         "device": device,
         "bike_name": bike_name,
         "moving_time_s": _f(session.get("total_timer_time")),

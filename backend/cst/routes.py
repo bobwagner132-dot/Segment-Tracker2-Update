@@ -536,8 +536,15 @@ async def upload_ride(file: UploadFile = File(...), uid: int = Depends(current_u
     # Reverse geocode best-effort
     auto_name = None
     place = await reverse_geocode(pts[0]["lat"], pts[0]["lon"])
+    is_indoor = (str(meta.get("sub_sport") or "").lower() == "indoor")
+    prefix = "INDOOR " if is_indoor else ""
     if place:
-        auto_name = f"{place} Ride"
+        auto_name = f"{prefix}{place} Ride"
+    elif is_indoor:
+        # No reverse-geocode result (often the case for indoor rides whose
+        # GPS coords sit on a single home pixel or are missing entirely) —
+        # fall back to a bare INDOOR tag so the user still sees it flagged.
+        auto_name = "INDOOR Ride"
     parsed_name = (parsed.get("name") or "").strip()
     base_fn = Path(file.filename or "ride").stem
     generic = {"", "unnamed", "fit ride", "cycling ride", base_fn.lower()}
