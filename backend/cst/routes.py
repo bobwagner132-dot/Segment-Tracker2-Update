@@ -94,6 +94,10 @@ def stream_full_update():
         if scripts.exists():
             tar.add(str(scripts), arcname="scripts",
                     filter=lambda ti: None if "__pycache__" in ti.name else ti)
+        # User-facing docs (Mac deployment guide, maintenance how-to, etc.).
+        docs = root / "docs"
+        if docs.exists():
+            tar.add(str(docs), arcname="docs")
     buf.seek(0)
     return StreamingResponse(
         iter([buf.getvalue()]),
