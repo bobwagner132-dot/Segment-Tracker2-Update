@@ -119,8 +119,18 @@ A personal cycling analysis web app. Define segments (GPX), upload rides (GPX/FI
 
 ## Backlog / Future
 - ⚠️ Legacy `backend/tests/backend_test.py` (27 tests) hasn't been migrated to a logged-in session — they assert 200 on auth-protected routes and now fail with 401. Action: add a shared `_login_session()` fixture (pattern in `test_auth_and_pr.py`) and update each test to login first.
+- **Indoor-flag in Leaderboards** (Design 🅱️, requested May 2026):
+  - A ride counts as **indoor** when `sub_sport ∈ {Indoor, Generic}` (Generic treated as suspicious by user preference).
+  - Leaderboards page: `☐ Show indoor efforts` toggle at top, OFF by default.
+  - When toggled on, indoor rows shown muted/yellow tint with `INDOOR` pill.
+  - **PR / "Best Effort" hero cards must NEVER include indoor efforts** so outdoor PRs stay protected.
+  - Same exclusion in the `best_effort` field on `/api/segments` + `/api/segments/{id}`.
+  - Live-updates when a ride's `sub_sport` is changed via `PATCH /api/rides/{id}/meta` — no migration / cache work needed (leaderboard is computed from a live JOIN).
+  - Files: `cst/routes.py::list_segment_efforts`, `_segment_best_map`; `pages/Leaderboards.jsx`; `pages/Segments.jsx` (PR card).
+  - Est. ~40 min when picked up.
 - Filter / search Activities by date range / year / sub-sport / bike (P2).
 - First-launch welcome overlay explaining data folder + backup configuration (P2, suggested).
+- Maintenance log: "since last event" badge per part (km + days since latest event). Roughly 30 min.
 - Year-over-year overlay on cumulative dashboard charts.
 - Export individual ride as GPX.
 
