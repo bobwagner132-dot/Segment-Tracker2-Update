@@ -128,6 +128,23 @@ A personal cycling analysis web app. Define segments (GPX), upload rides (GPX/FI
   - Live-updates when a ride's `sub_sport` is changed via `PATCH /api/rides/{id}/meta` — no migration / cache work needed (leaderboard is computed from a live JOIN).
   - Files: `cst/routes.py::list_segment_efforts`, `_segment_best_map`; `pages/Leaderboards.jsx`; `pages/Segments.jsx` (PR card).
   - Est. ~40 min when picked up.
+- **Monthly goal tracker** on the Dashboard (requested May 2026):
+  - **Where**: between the delete buttons row and the yearly total graphs.
+  - **Configurable inputs** (persisted, per-user): Monthly km goal · Monthly climbing-m goal.
+  - **Current-month progress cards** (live, computed from current month's activities):
+    1. Kilometres ridden so far this month
+    2. Climbing metres so far this month
+    3. Moving time so far this month
+  - **To-go cards**:
+    1. Km remaining to hit km goal
+    2. Climbing m remaining to hit climbing goal
+  - **Daily-pace required to hit goal by month-end**:
+    1. km/day still required = `(km_goal − current_km) / days_remaining_in_month`
+    2. m/day still required = `(climbing_goal − current_climbing) / days_remaining_in_month`
+  - When the goal is already exceeded, show an "🏁 Goal hit" pill instead of the "to-go" / "daily-pace" cards.
+  - Settings storage: extend the existing user-preferences row (likely a new `monthly_goal_km` + `monthly_goal_climbing_m` column in `users`, or a JSON `preferences` blob). Goals editable inline on the dashboard cards (pencil-icon pattern already in use elsewhere).
+  - Files: `cst/db.py` (schema), `cst/routes.py` (new `/api/stats/month` + goal CRUD), `pages/Dashboard.jsx` (new section), `lib/api.js` (helpers).
+  - Est. ~1.5–2 hours when picked up.
 - Filter / search Activities by date range / year / sub-sport / bike (P2).
 - First-launch welcome overlay explaining data folder + backup configuration (P2, suggested).
 - Maintenance log: "since last event" badge per part (km + days since latest event). Roughly 30 min.
