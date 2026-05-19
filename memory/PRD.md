@@ -130,6 +130,7 @@ A personal cycling analysis web app. Define segments (GPX), upload rides (GPX/FI
   - Est. ~40 min when picked up.
 - **Monthly goal tracker** on the Dashboard (requested May 2026):
   - **Where**: between the delete buttons row and the yearly total graphs.
+    *Note*: the delete-buttons row should be moved to the **Admin** tab as part of this work (see next item) — so in effect this section sits near the top of the Dashboard once that move is done.
   - **Configurable inputs** (persisted, per-user): Monthly km goal · Monthly climbing-m goal.
   - **Current-month progress cards** (live, computed from current month's activities):
     1. Kilometres ridden so far this month
@@ -141,10 +142,16 @@ A personal cycling analysis web app. Define segments (GPX), upload rides (GPX/FI
   - **Daily-pace required to hit goal by month-end**:
     1. km/day still required = `(km_goal − current_km) / days_remaining_in_month`
     2. m/day still required = `(climbing_goal − current_climbing) / days_remaining_in_month`
+    Hide both daily-pace cards on the last day of the month (`days_remaining == 0`).
   - When the goal is already exceeded, show an "🏁 Goal hit" pill instead of the "to-go" / "daily-pace" cards.
   - Settings storage: extend the existing user-preferences row (likely a new `monthly_goal_km` + `monthly_goal_climbing_m` column in `users`, or a JSON `preferences` blob). Goals editable inline on the dashboard cards (pencil-icon pattern already in use elsewhere).
   - Files: `cst/db.py` (schema), `cst/routes.py` (new `/api/stats/month` + goal CRUD), `pages/Dashboard.jsx` (new section), `lib/api.js` (helpers).
   - Est. ~1.5–2 hours when picked up.
+- **Move "Delete all segments / Delete all activities" buttons from Dashboard to Admin tab** (requested May 2026):
+  - The destructive bulk-delete row currently sits on the Dashboard, which mixes "read-only at-a-glance" with "danger zone".
+  - Relocate to the **Admin** tab, ideally grouped next to the existing "Wipe all leaderboards" section so all destructive operations live in one place.
+  - Files: `pages/Dashboard.jsx` (remove buttons), `pages/Admin.jsx` (add new "Danger zone" section). Confirm dialog pattern already established.
+  - Est. ~15 min.
 - Filter / search Activities by date range / year / sub-sport / bike (P2).
 - First-launch welcome overlay explaining data folder + backup configuration (P2, suggested).
 - Maintenance log: "since last event" badge per part (km + days since latest event). Roughly 30 min.
