@@ -1063,6 +1063,111 @@ def stats(uid: int = Depends(current_user_id)):
     return {"segments": seg, "rides": ride, "efforts": eff}
 
 
+# ---------- Monthly goals & current-month progress ----------
+@router.get("/stats/month")
+def monthly_stats(uid: int = Depends(current_user_id)):
+    """Return this calendar month's progress + goals + remaining/daily-pace.
+
+    Used by the Dashboard's Monthly Goals panel. Goal values default to None
+    when the user hasn't set them — the UI treats that as "not configured".
+    """
+    import calendar
+    now = datetime.now(timezone.utc)
+    year, month = now.year, now.month
+    month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+    days_in_month = calendar.monthrange(year, month)[1]
+    # `days_remaining` includes today, so a daily-pace card on the 1st of a
+    # 30-day month divides by 30. Hide the card when this drops to 0.
+    days_remaining = days_in_month - now.day + 1
+
+    with get_conn() as c:
+        u = c.execute(
+            "SELECT monthly_goal_km, monthly_goal_climbing_m FROM users WHERE id = ?",
+            (uid,),
+        ).fetchone() or {}
+        rows = c.execute(
+            "SELECT distance_m, elevation_gain_m, total_ascent_m, moving_time_s, duration_s, "
+            "start_time, created_at FROM rides WHERE user_id = ?",
+            (uid,),
+        ).fetchall()
+
+    km_total = 0.0
+    climbing_total = 0.0
+    moving_s_total = 0.0
+    for r in rows:
+        t = r["start_time"] or r["created_at"]
+        try:
+            d = datetime.fromisoformat(t.replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if d < month_start:
+            continue
+        if d.year != year or d.month != month:
+            continue
+        km_total += (r["distance_m"] or 0) / 1000
+        # Prefer the FIT session total_ascent over the recomputed value.
+        ele = r["total_ascent_m"] if r["total_ascent_m"] is not None else (r["elevation_gain_m"] or 0)
+        climbing_total += ele or 0
+        moving_s_total += (r["moving_time_s"] or r["duration_s"] or 0)
+
+    goal_km = u["monthly_goal_km"] if u and "monthly_goal_km" in u.keys() else None
+    goal_climb = u["monthly_goal_climbing_m"] if u and "monthly_goal_climbing_m" in u.keys() else None
+
+    def _to_go(goal, current):
+        if goal is None:
+            return None
+        return max(0, round((goal - current) * 10) / 10)
+
+    def _daily_pace(goal, current):
+        if goal is None or days_remaining <= 0:
+            return None
+        remaining = goal - current
+        if remaining <= 0:
+            return 0
+        return round((remaining / days_remaining) * 10) / 10
+
+    return {
+        "year": year,
+        "month": month,
+        "days_in_month": days_in_month,
+        "days_remaining": days_remaining,
+        "km_this_month": round(km_total * 10) / 10,
+        "climbing_m_this_month": int(round(climbing_total)),
+        "moving_time_s_this_month": int(round(moving_s_total)),
+        "goal_km": goal_km,
+        "goal_climbing_m": goal_climb,
+        "km_to_go": _to_go(goal_km, km_total),
+        "climbing_m_to_go": _to_go(goal_climb, climbing_total),
+        "km_per_day_required": _daily_pace(goal_km, km_total),
+        "m_per_day_required": _daily_pace(goal_climb, climbing_total),
+        "km_goal_hit": goal_km is not None and km_total >= goal_km,
+        "climbing_goal_hit": goal_climb is not None and climbing_total >= goal_climb,
+    }
+
+
+class MonthlyGoalsBody(BaseModel):
+    monthly_goal_km: Optional[int] = None
+    monthly_goal_climbing_m: Optional[int] = None
+
+
+@router.patch("/preferences/monthly-goals")
+def update_monthly_goals(body: MonthlyGoalsBody, uid: int = Depends(current_user_id)):
+    """Persist the user's monthly km / climbing goals. Either value may be
+    null to clear it. Negative values are clamped to 0."""
+    km = body.monthly_goal_km
+    climb = body.monthly_goal_climbing_m
+    if km is not None and km < 0:
+        km = 0
+    if climb is not None and climb < 0:
+        climb = 0
+    with get_conn() as c:
+        c.execute(
+            "UPDATE users SET monthly_goal_km = ?, monthly_goal_climbing_m = ? WHERE id = ?",
+            (km, climb, uid),
+        )
+    return {"ok": True, "monthly_goal_km": km, "monthly_goal_climbing_m": climb}
+
+
 @router.get("/stats/yearly")
 def yearly_stats(year: Optional[int] = None, uid: int = Depends(current_user_id)):
     with get_conn() as c:

@@ -319,6 +319,17 @@ export async function getYearlyStats(year) {
   return apiGet("/stats/yearly", year ? { year } : undefined);
 }
 
+export async function getMonthlyStats() {
+  return apiGet("/stats/month");
+}
+
+export async function updateMonthlyGoals({ monthly_goal_km, monthly_goal_climbing_m }) {
+  return apiPatch("/preferences/monthly-goals", {
+    monthly_goal_km,
+    monthly_goal_climbing_m,
+  });
+}
+
 // ---------- Backup / Restore ----------
 export async function downloadBackup() {
   return apiGet("/backup");

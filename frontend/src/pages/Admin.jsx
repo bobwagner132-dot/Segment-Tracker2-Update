@@ -26,6 +26,9 @@ import {
   adminDeleteUser,
   adminResetPassword,
   adminSetAdmin,
+  deleteAllRides,
+  deleteAllSegments,
+  getStats,
   formatApiError,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -48,23 +51,28 @@ export default function Admin() {
   const [storage, setStorage] = useState(null);
   const [sched, setSched] = useState(null);
   const [backups, setBackups] = useState([]);
+  const [stats, setStats] = useState({ segments: 0, rides: 0, efforts: 0 });
   const [busy, setBusy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(null);
   const [confirmOrphans, setConfirmOrphans] = useState(false);
   const [confirmWipeEfforts, setConfirmWipeEfforts] = useState(false);
   const [confirmWipeOrphanEfforts, setConfirmWipeOrphanEfforts] = useState(false);
+  const [confirmPurgeRides, setConfirmPurgeRides] = useState(false);
+  const [confirmPurgeSegs, setConfirmPurgeSegs] = useState(false);
   const uploadRef = useRef(null);
 
   async function refresh() {
     try {
-      const [s, sc, b] = await Promise.all([
+      const [s, sc, b, st] = await Promise.all([
         getAdminStorage(),
         _json("GET", "/admin/scheduler"),
         listAdminBackups(),
+        getStats(),
       ]);
       setStorage(s);
       setSched(sc);
       setBackups(b);
+      setStats(st);
     } catch (e) {
       toast.error(`Load failed: ${e.message || e}`);
     }
@@ -167,6 +175,34 @@ export default function Admin() {
       await refresh();
     } catch (e) {
       toast.error(`Cleanup failed: ${e.message || e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function purgeAllRides() {
+    setConfirmPurgeRides(false);
+    setBusy(true);
+    try {
+      await deleteAllRides();
+      toast.success("All activities cleared");
+      await refresh();
+    } catch (e) {
+      toast.error(`Delete failed: ${e.message || e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function purgeAllSegments() {
+    setConfirmPurgeSegs(false);
+    setBusy(true);
+    try {
+      await deleteAllSegments();
+      toast.success("All segments & leaderboards cleared");
+      await refresh();
+    } catch (e) {
+      toast.error(`Delete failed: ${e.message || e}`);
     } finally {
       setBusy(false);
     }
@@ -421,6 +457,47 @@ export default function Admin() {
         </button>
       </section>
 
+      {/* Bulk-delete: full activities / full segments. Moved here from the
+          Dashboard so all destructive operations live in one place. */}
+      <section
+        className="border border-danger/40 bg-danger/5 p-5 space-y-3"
+        data-testid="admin-danger-zone"
+      >
+        <div className="flex items-center gap-2">
+          <Trash2 className="w-4 h-4 text-danger" />
+          <div className="font-display font-bold uppercase tracking-tight text-danger">
+            Danger zone
+          </div>
+        </div>
+        <div className="text-sm text-secondary">
+          Permanently delete every activity or every segment for this profile.
+          The other data is kept (e.g. wiping activities leaves segments and
+          bikes intact). All efforts tied to the deleted rows are removed too.
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => setConfirmPurgeRides(true)}
+            disabled={busy || stats.rides === 0}
+            data-testid="admin-delete-all-activities"
+            className="inline-flex items-center gap-2 border border-danger px-3 py-2 text-[10px] uppercase tracking-[0.25em] font-bold text-danger hover:bg-danger/10 disabled:opacity-40"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete all activities ({stats.rides})
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmPurgeSegs(true)}
+            disabled={busy || (stats.segments === 0 && stats.efforts === 0)}
+            data-testid="admin-delete-all-segments"
+            className="inline-flex items-center gap-2 border border-danger px-3 py-2 text-[10px] uppercase tracking-[0.25em] font-bold text-danger hover:bg-danger/10 disabled:opacity-40"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete segments &amp; leaderboards ({stats.segments}/{stats.efforts})
+          </button>
+        </div>
+      </section>
+
       <ConfirmDialog
         open={!!confirmRestore}
         title={`Restore ${confirmRestore?.name}?`}
@@ -463,6 +540,28 @@ export default function Admin() {
         testid="admin-confirm-wipe-leaderboards"
         onConfirm={wipeAllEfforts}
         onCancel={() => setConfirmWipeEfforts(false)}
+      />
+      <ConfirmDialog
+        open={confirmPurgeRides}
+        title={`Delete all ${stats.rides} activities?`}
+        description="Every uploaded activity AND every detected effort will be permanently removed. Segments and the bike registry are kept. This cannot be undone."
+        confirmLabel="Delete everything"
+        cancelLabel="Keep"
+        destructive
+        testid="admin-confirm-delete-all-activities"
+        onConfirm={purgeAllRides}
+        onCancel={() => setConfirmPurgeRides(false)}
+      />
+      <ConfirmDialog
+        open={confirmPurgeSegs}
+        title={`Delete all ${stats.segments} segments & ${stats.efforts} leaderboard entries?`}
+        description="Every segment definition AND every detected effort/leaderboard row will be permanently removed. Activities and the bike registry are kept. This cannot be undone."
+        confirmLabel="Delete segments & leaderboards"
+        cancelLabel="Keep"
+        destructive
+        testid="admin-confirm-delete-all-segments"
+        onConfirm={purgeAllSegments}
+        onCancel={() => setConfirmPurgeSegs(false)}
       />
     </div>
   );

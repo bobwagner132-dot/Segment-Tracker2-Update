@@ -69,7 +69,9 @@ CREATE TABLE IF NOT EXISTS users (
     created_at      TEXT NOT NULL,
     last_login_at   TEXT,
     failed_attempts INTEGER NOT NULL DEFAULT 0,
-    locked_until    TEXT
+    locked_until    TEXT,
+    monthly_goal_km          INTEGER,
+    monthly_goal_climbing_m  INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS segments (
@@ -190,6 +192,8 @@ def init_db() -> None:
             ("last_login_at", "ALTER TABLE users ADD COLUMN last_login_at TEXT"),
             ("failed_attempts", "ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0"),
             ("locked_until", "ALTER TABLE users ADD COLUMN locked_until TEXT"),
+            ("monthly_goal_km", "ALTER TABLE users ADD COLUMN monthly_goal_km INTEGER"),
+            ("monthly_goal_climbing_m", "ALTER TABLE users ADD COLUMN monthly_goal_climbing_m INTEGER"),
         ):
             if col not in existing_cols:
                 c.execute(ddl)
