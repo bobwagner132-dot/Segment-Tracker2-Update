@@ -134,18 +134,28 @@ def _seg_detail(row, best=None, effort_count=0) -> dict:
 def _segment_best_map(conn, uid: int, seg_ids: Optional[List[str]] = None) -> Dict[str, dict]:
     """Return {segment_id: {effort fields}} for the user's PR per segment.
 
-    A PR is the row with the smallest `elapsed_s` for that segment. Joined
-    with rides so we can surface the ride name and start_time alongside.
+    A PR is the row with the smallest `elapsed_s` for that segment,
+    **excluding efforts on indoor rides** (sub_sport in {Indoor, Generic}).
+    This protects outdoor PRs from being beaten by Zwift / trainer sessions
+    where speed and effort don't translate to real terrain. Joined with
+    rides so we can surface the ride name and start_time alongside.
     """
     if seg_ids is not None and len(seg_ids) == 0:
         return {}
+    indoor_filter = (
+        " AND (LOWER(COALESCE(r0.sub_sport, '')) NOT IN ('indoor', 'generic'))"
+    )
     sql = (
         "SELECT e.segment_id, e.id as effort_id, e.ride_id, e.elapsed_s, "
-        "e.datetime_utc, e.avg_power, e.avg_hr, r.name AS ride_name "
+        "e.datetime_utc, e.avg_power, e.avg_hr, r.name AS ride_name, "
+        "r.sub_sport AS ride_sub_sport "
         "FROM efforts e JOIN rides r ON r.id = e.ride_id "
         "WHERE e.user_id = ? "
+        "AND (LOWER(COALESCE(r.sub_sport, '')) NOT IN ('indoor', 'generic')) "
         "AND e.elapsed_s = (SELECT MIN(e2.elapsed_s) FROM efforts e2 "
-        "WHERE e2.segment_id = e.segment_id AND e2.user_id = e.user_id)"
+        "JOIN rides r0 ON r0.id = e2.ride_id "
+        "WHERE e2.segment_id = e.segment_id AND e2.user_id = e.user_id"
+        + indoor_filter + ")"
     )
     params: List[Any] = [uid]
     if seg_ids is not None:
@@ -356,15 +366,27 @@ def delete_all_segments(uid: int = Depends(current_user_id)):
 
 @router.get("/segments/{seg_id}/efforts")
 def list_segment_efforts(seg_id: str, uid: int = Depends(current_user_id)):
+    """Return every effort against the segment, annotated with the
+    associated ride's `sub_sport` and an `is_indoor` flag. Indoor efforts
+    (sub_sport in {Indoor, Generic}) are returned but the frontend may
+    hide them and the PR calculation in `_segment_best_map` excludes
+    them so outdoor PRs stay protected.
+    """
     with get_conn() as c:
         rows = c.execute(
-            "SELECT e.*, r.name as ride_name "
+            "SELECT e.*, r.name as ride_name, r.sub_sport as ride_sub_sport "
             "FROM efforts e JOIN rides r ON r.id = e.ride_id "
             "WHERE e.segment_id = ? AND e.user_id = ? "
             "ORDER BY e.elapsed_s ASC",
             (seg_id, uid),
         ).fetchall()
-    return [dict(r) for r in rows]
+    out = []
+    for r in rows:
+        d = dict(r)
+        ss = (d.get("ride_sub_sport") or "")
+        d["is_indoor"] = str(ss).strip().lower() in {"indoor", "generic"}
+        out.append(d)
+    return out
 
 
 # ============================ RIDES ============================
