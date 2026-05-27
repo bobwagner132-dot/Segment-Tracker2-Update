@@ -145,7 +145,7 @@ function GoalBlock({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <EditableNumber
           label={`Goal ${unit}/month`}
           value={goalValue}
@@ -163,34 +163,38 @@ function GoalBlock({
           testid={`${testid}-current`}
         />
         {goalHit ? (
-          <div className="col-span-1 flex flex-col justify-center items-center gap-1 border border-volt-40 bg-volt-5 p-3">
+          <div className="col-span-2 flex flex-col justify-center items-center gap-1 border border-volt-40 bg-volt-5 p-3">
             <Flag className="w-5 h-5 text-volt" strokeWidth={1.6} />
             <div className="text-[10px] tracking-[0.3em] uppercase text-volt font-bold">
               Goal hit
             </div>
           </div>
         ) : (
-          <ReadOnlyNumber
-            label={`${unit} to goal`}
-            value={toGo}
-            unit={unit}
-            faded={goalValue == null}
-            testid={`${testid}-togo`}
-          />
+          <>
+            <ReadOnlyNumber
+              label={`${unit} to goal`}
+              value={toGo}
+              unit={unit}
+              faded={goalValue == null}
+              testid={`${testid}-togo`}
+            />
+            <div data-testid={`${testid}-daily`}>
+              <div className="text-[10px] tracking-[0.3em] uppercase text-muted">
+                {unit}/day required
+              </div>
+              <div className={`font-num text-2xl font-black mt-1 ${(!showDailyPace || goalValue == null) ? "text-faint" : ""}`}>
+                {showDailyPace && goalValue != null && dailyRequired != null
+                  ? dailyRequired
+                  : "—"}
+                {showDailyPace && goalValue != null && dailyRequired != null && (
+                  <span className="text-xs text-muted ml-1">{unit}/day</span>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </div>
 
-      {showDailyPace && !goalHit && goalValue != null && (
-        <div className="mt-5 border-t border-line-subtle pt-4 flex items-baseline justify-between gap-3">
-          <div className="text-[10px] tracking-[0.3em] uppercase text-muted">
-            {unit}/day required
-          </div>
-          <div className="font-num text-2xl font-black">
-            {dailyRequired != null ? dailyRequired : "—"}
-            <span className="text-xs text-muted ml-1">{unit}/day</span>
-          </div>
-        </div>
-      )}
       {goalValue == null && (
         <div className="mt-4 text-[10px] tracking-[0.25em] uppercase text-muted">
           Tap the goal number to set one
