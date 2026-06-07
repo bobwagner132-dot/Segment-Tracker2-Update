@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import UploadZone from "../components/UploadZone";
 import MapView from "../components/MapView";
+import { decimate } from "../lib/detector";
 import ElevationChart from "../components/ElevationChart";
 import EditableName from "../components/EditableName";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -47,6 +48,7 @@ const SUB_SPORTS = [
   "Mountain",
   "Cyclocross",
   "Indoor",
+  "Virtual",
   "Commute",
   "Touring",
   "E-bike",
@@ -291,13 +293,13 @@ export default function Rides() {
               </div>
 
               <MapView
-                points={selected.points}
+                points={decimate(selected.points || [], 500)}
                 color="#FF3B30"
                 overlayPoints={overlayPoints}
                 height={420}
                 testid="ride-map"
               />
-              <ElevationChart points={selected.points} height={200} color="#FF3B30" testid="ride-elevation" />
+              <ElevationChart points={decimate(selected.points || [], 500)} height={200} color="#FF3B30" testid="ride-elevation" />
 
               {selected.efforts?.length > 0 && (
                 <div className="border border-line bg-surface p-6" data-testid="ride-efforts">
@@ -404,28 +406,44 @@ function BikeField({ value, bikes = [], onSave }) {
       </div>
       {editing ? (
         <div className="flex items-center gap-2">
-          <input
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commit();
-              else if (e.key === "Escape") {
-                setDraft(value || "");
-                setEditing(false);
-              }
-            }}
-            disabled={busy}
-            placeholder="e.g. S-Works Tarmac"
-            list="cst-bike-suggestions"
-            data-testid="ride-bike-input"
-            className="flex-1 bg-transparent border-b border-accent text-sm focus:outline-none"
-          />
-          <datalist id="cst-bike-suggestions">
-            {bikes.map((b) => (
-              <option key={b} value={b} />
-            ))}
-          </datalist>
+          <div className="flex-1 flex flex-col gap-1">
+            {bikes.length > 0 && (
+              <select
+                value={bikes.includes(draft) ? draft : ""}
+                onChange={(e) => {
+                  if (e.target.value !== "__custom__") {
+                    setDraft(e.target.value);
+                  } else {
+                    setDraft("");
+                  }
+                }}
+                disabled={busy}
+                className="bg-transparent border-b border-accent text-sm focus:outline-none w-full"
+              >
+                <option value="">— Select bike —</option>
+                {bikes.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+                <option value="__custom__">+ Enter new bike...</option>
+              </select>
+            )}
+            <input
+              autoFocus={bikes.length === 0}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commit();
+                else if (e.key === "Escape") {
+                  setDraft(value || "");
+                  setEditing(false);
+                }
+              }}
+              disabled={busy}
+              placeholder="Or type a new bike name..."
+              data-testid="ride-bike-input"
+              className="bg-transparent border-b border-accent text-sm focus:outline-none w-full"
+            />
+          </div>
           <button
             onClick={commit}
             disabled={busy}
@@ -487,14 +505,17 @@ function SubSportField({ value, onSave }) {
         <div className="flex items-center gap-2">
           <select
             autoFocus
-            value={draft}
+            value={SUB_SPORTS.includes(draft) ? draft : draft ? "Other" : ""}
             onChange={(e) => {
-              setDraft(e.target.value);
-              commit(e.target.value);
+              if (e.target.value !== "Other") {
+                setDraft(e.target.value);
+                commit(e.target.value);
+              } else {
+                setDraft("Other");
+              }
             }}
             data-testid="ride-subsport-select"
-            className="flex-1 bg-transparent border-b border-accent text-sm focus:outline-none"
-          >
+            className="flex-1 bg-transparent border-b border-accent text-sm focus:outline-none" >
             <option value="">— None —</option>
             {SUB_SPORTS.map((s) => (
               <option key={s} value={s}>
@@ -502,6 +523,18 @@ function SubSportField({ value, onSave }) {
               </option>
             ))}
           </select>
+          {(draft === "Other" || (!SUB_SPORTS.includes(draft) && draft)) && (
+            <input
+              autoFocus
+              type="text"
+              placeholder="Enter custom sub-sport"
+              value={SUB_SPORTS.includes(draft) ? "" : draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => commit(draft)}
+              onKeyDown={(e) => e.key === "Enter" && commit(draft)}
+              className="flex-1 bg-transparent border-b border-accent text-sm focus:outline-none"
+            />
+          )}
           <button
             onClick={() => {
               setDraft(value || "");

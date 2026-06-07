@@ -574,6 +574,11 @@ async def upload_ride(file: UploadFile = File(...), uid: int = Depends(current_u
     )
     final_name = auto_name if use_auto else (parsed_name or base_fn)
 
+    # Prefix Virtual rides with "Indoor: "
+    sub_sport_check = (meta.get("sub_sport") or "").lower()
+    if "virtual" in sub_sport_check and not final_name.startswith("Indoor: "):
+        final_name = f"Indoor: {final_name}"
+
     # Resolve bike (mirrors the JS algorithm)
     sub_sport = meta.get("sub_sport")
     bike_name = meta.get("bike_name")

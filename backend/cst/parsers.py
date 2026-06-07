@@ -155,7 +155,7 @@ def parse_fit(raw: bytes) -> dict:
 
     meta = {
         "sport": _title_case(session.get("sport")),
-        "sub_sport": _title_case(session.get("sub_sport")),
+        "sub_sport": (lambda s: "Virtual" if s and "virtual" in s.lower() else _title_case(s))(session.get("sub_sport")),
         "device": device,
         "bike_name": bike_name,
         "moving_time_s": _f(session.get("total_timer_time")),

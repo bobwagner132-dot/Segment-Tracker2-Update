@@ -1,0 +1,60 @@
+{
+  "name": "segment-tracker",
+  "version": "1.0.1",
+  "description": "Cycling Segment Tracker \u2014 standalone Mac app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.yourname.segmenttracker",
+    "productName": "Segment Tracker",
+    "mac": {
+      "category": "public.app-category.sports",
+      "minimumSystemVersion": "11.0",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.icns"
+    },
+    "files": [
+      "main.js",
+      "icon.icns"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/build",
+        "to": "frontend/build",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!__pycache__",
+          "!*.pyc"
+        ]
+      },
+      {
+        "from": "../venv",
+        "to": "venv",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.0.0"
+  }
+}

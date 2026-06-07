@@ -1,5 +1,5 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { fmtTime } from "../lib/api";
 
 function haversine(a, b) {
@@ -22,6 +22,8 @@ export default function ElevationChart({
   color = "#00E5FF",
 }) {
   const [mode, setMode] = useState("distance"); // "distance" | "time"
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setMounted(true), 100); return () => clearTimeout(t); }, []);
 
   const { data, hasTime } = useMemo(() => {
     if (!points || points.length === 0) return { data: [], hasTime: false };
@@ -49,7 +51,7 @@ export default function ElevationChart({
   }, [points]);
 
   const hasEle = data.some((d) => d.ele != null);
-  if (!hasEle) {
+  if (!mounted || !hasEle) {
     return (
       <div
         data-testid={`${testid}-empty`}
